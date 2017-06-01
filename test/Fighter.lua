@@ -1,0 +1,2 @@
+-- Fighter.lua --
+-- class Fighter --

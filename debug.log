@@ -1,0 +1,92 @@
+Quick-Cocos2dx-Community C++ support ready.
+
+------------------------------------------------
+
+LOAD LUA FILE: D:/kevin/sync/nut/code/card/src/main.lua
+
+------------------------------------------------
+
+[LUA-print] ===========================================================
+
+[LUA-print]               LOAD QUICK FRAMEWORK
+
+[LUA-print] ===========================================================
+
+[LUA-print] [INFO] 
+
+[LUA-print] [INFO] # DEBUG                        = 1
+
+[LUA-print] [INFO] #
+
+[LUA-print] [INFO] # device.platform              = windows
+
+[LUA-print] [INFO] # device.model                 = unknown
+
+[LUA-print] [INFO] # device.language              = cn
+
+[LUA-print] [INFO] # device.writablePath          = D:\kevin\sync\nut\code\card\
+
+[LUA-print] [INFO] # device.directorySeparator    = \
+
+[LUA-print] [INFO] # device.pathSeparator         = ;
+
+[LUA-print] [INFO] #
+
+[LUA-print] [INFO] # CONFIG_SCREEN_AUTOSCALE      = FIXED_HEIGHT
+
+[LUA-print] [INFO] # CONFIG_SCREEN_WIDTH          = 1620.00
+
+[LUA-print] [INFO] # CONFIG_SCREEN_HEIGHT         = 1080.00
+
+[LUA-print] [INFO] # display.widthInPixels        = 960.00
+
+[LUA-print] [INFO] # display.heightInPixels       = 640.00
+
+[LUA-print] [INFO] # display.contentScaleFactor   = 0.59
+
+[LUA-print] [INFO] # display.width                = 1620.00
+
+[LUA-print] [INFO] # display.height               = 1080.00
+
+[LUA-print] [INFO] # display.cx                   = 810.00
+
+[LUA-print] [INFO] # display.cy                   = 540.00
+
+[LUA-print] [INFO] # display.left                 = 0.00
+
+[LUA-print] [INFO] # display.right                = 1620.00
+
+[LUA-print] [INFO] # display.top                  = 1080.00
+
+[LUA-print] [INFO] # display.bottom               = 0.00
+
+[LUA-print] [INFO] # display.c_left               = -810.00
+
+[LUA-print] [INFO] # display.c_right              = 810.00
+
+[LUA-print] [INFO] # display.c_top                = 540.00
+
+[LUA-print] [INFO] # display.c_bottom             = -540.00
+
+[LUA-print] [INFO] #
+
+[LUA-print] request error: 	7	Couldn't connect to server
+
+[LUA-print] network failed!
+
+[LUA-print] request error: 	7	Couldn't connect to server
+
+[LUA-print] network failed!
+
+[LUA-print] request error: 	7	Couldn't connect to server
+
+[LUA-print] network failed!
+
+[LUA-print] request error: 	7	Couldn't connect to server
+
+[LUA-print] network failed!
+
+[LUA-print] request error: 	7	Couldn't connect to server
+
+[LUA-print] network failed!
+

@@ -1,0 +1,50 @@
+{
+	"tank_A01": {
+		"id": "tank_A01", "model": "Aries",
+		"speed": 1.45, "firing": 3.0, "defence": 0.20
+	},
+	"tank_A02": {
+		"id": "tank_A02", "model": "Leo",
+		"speed": 1.75, "firing": 3.0, "defence": 0.20
+	},
+	"tank_A03": {
+		"id": "tank_A03", "model": "Aquarius",
+		"speed": 1.77, "firing": 3.0, "defence": 0.20
+	},
+	"tank_B01": {
+		"id": "tank_B01", "model": "Libra",
+		"speed": 1.73, "firing": 3.0, "defence": 0.30
+	},
+	"tank_B02": {
+		"id": "tank_B02", "model": "Virgo",
+		"speed": 1.72, "firing": 3.0, "defence": 0.30
+	},
+	"tank_B03": {
+		"id": "tank_B03", "model": "Scorpio",
+		"speed": 1.73, "firing": 3.5, "defence": 0.30
+	},
+	"tank_D01": {
+		"id": "tank_D01", "model": "Taurus",
+		"speed": 1.71, "firing": 3.0, "defence": 0.40
+	},
+	"tank_D02": {
+		"id": "tank_D02", "model": "Cancer",
+		"speed": 1.70, "firing": 3.0, "defence": 0.50
+	},
+	"tank_D03": {
+		"id": "tank_D03", "model": "Sagittarius",
+		"speed": 1.70, "firing": 3.5, "defence": 0.40
+	},
+	"tank_H01": {
+		"id": "tank_H01", "model": "Gemini",
+		"speed": 1.71, "firing": 3.0, "defence": 0.30
+	},
+	"tank_H02": {
+		"id": "tank_H02", "model": "Pisces",
+		"speed": 1.72, "firing": 3.0, "defence": 0.20
+	},
+	"tank_H03": {
+		"id": "tank_H03", "model": "Capricorn",
+		"speed": 1.72, "firing": 3.0, "defence": 0.20
+	}
+}

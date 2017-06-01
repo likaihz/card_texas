@@ -1,0 +1,133 @@
+{
+	"1": {
+		"name": "夜店佳", "uid": "1",
+		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
+		"chose": "tank_A01",
+		"tank": {
+			"tank_A01": {
+				"skin": ["s0", "s1", "s2"],
+				"chose": "s0"
+			},
+			"tank_A02": {
+				"skin": ["s0", "s1"],
+				"chose": "s0"
+			}
+		}
+	},
+	"2": {
+		"name": "锋削削", "uid": "2",
+		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
+		"chose": "tank_A01",
+		"tank": {
+			"tank_A01": {
+				"skin": ["s0", "s1", "s2"],
+				"chose": "s0"
+			},
+			"tank_A02": {
+				"skin": ["s0"],
+				"chose": "s0"
+			}
+		}
+	},
+	"3": {
+		"name": "你阿姨", "uid": "3",
+		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
+		"chose": "tank_A01",
+		"tank": {
+			"tank_A01": {
+				"skin": ["s0", "s1", "s4"],
+				"chose": "s0"
+			}
+		}
+	},
+	"4": {
+		"name": "你蛋哥", "uid": "4",
+		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
+		"chose": "tank_A01",
+		"tank": {
+			"tank_A01": {
+				"skin": ["s0", "s1", "s2"],
+				"chose": "s0"
+			},
+			"tank_A02": {
+				"skin": ["s0", "s3"],
+				"chose": "s0"
+			}
+		}
+	},
+	"5": {
+		"name": "你表哥", "uid": "5",
+		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
+		"chose": "tank_A01",
+		"tank": {
+			"tank_A01": {
+				"skin": ["s0", "s1", "s2"],
+				"chose": "s0"
+			},
+			"tank_A02": {
+				"skin": ["s2", "s3"],
+				"chose": "s0"
+			}
+		}
+	},
+	"6": {
+		"name": "你二舅", "uid": "6",
+		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
+		"chose": "tank_A01",
+		"tank": {
+			"tank_A01": {
+				"skin": ["s0", "s1", "s2"],
+				"chose": "s0"
+			},
+			"tank_A02": {
+				"skin": ["s2", "s3"],
+				"chose": "s0"
+			}
+		}
+	},
+	"7": {
+		"name": "你表妹", "uid": "7",
+		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
+		"chose": "tank_A01",
+		"tank": {
+			"tank_A01": {
+				"skin": ["s0", "s1", "s2"],
+				"chose": "s0"
+			},
+			"tank_A02": {
+				"skin": ["s2", "s3"],
+				"chose": "s0"
+			}
+		}
+	},
+	"8": {
+		"name": "社会覃", "uid": "8",
+		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
+		"chose": "tank_A01",
+		"tank": {
+			"tank_A01": {
+				"skin": ["s0", "s1", "s2"],
+				"chose": "s0"
+			},
+			"tank_A02": {
+				"skin": ["s2", "s3"],
+				"chose": "s0"
+			}
+		}
+	},
+	"9": {
+		"name": "老司机", "uid": "9",
+		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
+		"chose": "tank_A01",
+		"tank": {
+			"tank_A01": {
+				"skin": ["s0", "s1", "s2"],
+				"chose": "s0"
+			},
+			"tank_A02": {
+				"skin": ["s2", "s3"],
+				"chose": "s0"
+			}
+		}
+	}
+}
