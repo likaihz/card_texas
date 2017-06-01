@@ -18,7 +18,7 @@ type Player struct {
 	Idx           int
 	Uid, Name     string
 	cards         *card.Cards
-	chips, stakes int //chips是玩家拥有的筹码，stakes是下的赌注
+	Chips, Stakes int //chips是玩家拥有的筹码，stakes是下的赌注
 	Status        string
 }
 
@@ -86,14 +86,6 @@ func (p *Player) Fold() {
 
 }
 
-func (p *Player) Chips() int {
-	return p.chips
-}
-
-func (p *Player) Stakes() int {
-	return p.stakes
-}
-
 func (p *Player) Addstakes(s int) int {
 	p.stakes += s
 	return p.stakes
@@ -103,6 +95,7 @@ func (p *Player) All_in() int {
 	c := p.chips
 	p.chips -= c
 	p.stakes += c
+	p.Status = "allin"
 	return c
 }
 
@@ -110,26 +103,8 @@ func (p *Player) Cards() *card.Cards {
 	return p.cards
 }
 
-func (p *Player) Msg() map[string]interface{} {
-	msg := map[string]interface{}{}
-	msg["name"] = p.name
-	msg["rank"] = p.cards.Rank()
-	msg["cards"] = p.cards.Msg()
-	msg["score"] = p.score
-	return msg
-}
-
-func (p *Player) Send(msg map[string]interface{}) {
-	if p == nil {
-		return
-	}
-	str := xx.Map2str(msg)
-	p.cli <- str
-}
-
-// interface of action
 func (p *Player) Obtain(c *card.Card) {
-	p.cards.Insert(c)
+	p.cards.Append(c)
 }
 
 func (p *Player) Compare(player *Player) int {
@@ -137,23 +112,68 @@ func (p *Player) Compare(player *Player) int {
 	return p.cards.Compare(cards)
 }
 
-func (p *Player) Win(player *Player) {
-	// ...
+// interface of net
+func (p *Player) Seatmsg() map[string]interface{} {
+	data := map[string]interface{}{}
+	data["idx"] = p.Idx
+	data["name"] = p.Name
+	data["score"] = p.Score
+	data["status"] = p.Status
+	return data
 }
 
-func (p *Player) Sendcard(c *card.Card) {
-	msg := map[string]interface{}{}
-	msg["opt"] = "card"
-	msg["data"] = c.Msg()
-	p.Send(msg)
+func (p *Player) Cardmsg() map[string]interface{} {
+	data := map[string]interface{}{}
+	cards := p.cards
+	data["cards"] = cards.Msg()
+	rank := cards.Rank()
+	if rank != "" {
+		data["rank"] = rank
+		data["addscore"] = p.addscore
+	}
+	return data
 }
 
-func (p *Player) Sendcards() {
-	msg := map[string]interface{}{}
-	msg["opt"] = "cards"
-	msg["data"] = p.cards.Msg()
-	p.Send(msg)
+func (p *Player) Connect(conn *ws.Conn) {
+	p.conn = conn.Reload(p.conn)
+	p.conn.Send(nil)
 }
+
+func (p *Player) Disconnect() {
+	p.conn.Close()
+}
+
+func (p *Player) Send(opt string, data map[string]interface{}) {
+	if len(data) > 0 && p.Present() {
+		msg := map[string]interface{}{
+			"opt": opt, "data": data,
+		}
+		p.conn.Send(msg)
+	}
+}
+
+func (p *Player) Sendactive(opt string, data map[string]interface{}) {
+	if len(data) > 0 && p.Active() {
+		msg := map[string]interface{}{
+			"opt": opt, "data": data,
+		}
+		p.conn.Send(msg)
+	}
+}
+
+// func (p *Player) Sendcard(c *card.Card) {
+// 	msg := map[string]interface{}{}
+// 	msg["opt"] = "card"
+// 	msg["data"] = c.Msg()
+// 	p.Send(msg)
+// }
+
+// func (p *Player) Sendcards() {
+// 	msg := map[string]interface{}{}
+// 	msg["opt"] = "cards"
+// 	msg["data"] = p.cards.Msg()
+// 	p.Send(msg)
+// }
 
 func (p *Player) Stakeover() int {
 	c := p.chips
@@ -162,9 +182,9 @@ func (p *Player) Stakeover() int {
 
 }
 
-func (p *Player) Sendpermissions(act ...string) {
-	//...
-}
+// func (p *Player) Sendpermissions(act ...string) {
+// 	//...
+// }
 
 // implementation
 func getname(uid string) (string, error) {
@@ -190,6 +210,7 @@ func (p *Player) Print() {
 		idx := strconv.Itoa(p.idx)
 		s += idx + " : "
 		s += p.name
+		s += " " + p.Status
 	}
 	fmt.Println(s)
 }

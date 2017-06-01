@@ -2,6 +2,7 @@ package battle
 
 import (
 	"../card"
+	"../lib/ws"
 	"../lib/xx"
 	"../room"
 	"fmt"
@@ -16,15 +17,15 @@ type Battle struct {
 	config    map[string]interface{}
 	receiving chan map[string]interface{}
 	room      *room.Room
-	current   *room.Player
 	cards     []*card.Card
+	pot       int 	//奖池大小
+	board     []*card.Card 	//公共牌
 	roundnum  int
 	roundcnt  int
-	turning   string
+	
 	mode      string
 	ended     bool
-	pot       int
-	board     []*card.Card
+	
 }
 
 func New(match *Match, number int) *Battle {
@@ -45,11 +46,19 @@ func (b *Battle) Number() int {
 	return b.number
 }
 
-func (b *Battle) Received(msg map[string]interface{}, cli chan string) *Battle {
+func (b *Battle) Connect(uid string, conn *ws.Conn) {
+	b.room.Connect(uid, conn)
+}
+
+func (b *Battle) Received(msg map[string]interface{}, conn *ws.Conn) (bool, *Battle) {
 	if b == nil || b.ended {
-		return nil
+		return true, nil
 	}
-	opt := msg["opt"].(string)
+	ok, opt := xx.Getstring(msg, "opt")
+	if !ok {
+		b.end()
+		return false, nil
+	}
 	uid := msg["uid"].(string)
 	switch opt {
 	case "enter":
@@ -67,18 +76,17 @@ func (b *Battle) Received(msg map[string]interface{}, cli chan string) *Battle {
 	default:
 		b.receiving <- msg
 	}
-	return b
+	return true, b
 }
 
 func (b *Battle) receive(option string) map[string]interface{} {
 	for {
 		msg := <-b.receiving
-		val, ok := msg["opt"]
+		ok, opt := xx.Getstring(msg, "opt")
 		if !ok {
 			continue
 		}
-		opt, ok := val.(string)
-		if ok && opt == option {
+		if opt == option {
 			return msg
 		}
 	}
@@ -90,6 +98,7 @@ func (b *Battle) Enterable() bool {
 }
 
 func (b *Battle) Getconfig() map[string]interface{} {
+	b.config["roundcnt"] = b.roundcnt
 	return b.config
 }
 
@@ -112,14 +121,28 @@ func (b *Battle) Ended() boo l {
 	return b.ended
 }
 
+func (b *Battle) Msg(currents []*room.Player) map[string]interface{} {
+	data := map[string]interface{}{}
+	for _, p := range currents {
+		j := strconv.Itoa(p.Idx)
+		data[j] = p.Cardmsg()
+	}
+	return data
+}
+
 // implementation
 func (b *Battle) round() {
 	b.roundcnt++
 	b.cards = card.Init()
-	b.current = b.dealer() 
-	currents := b.room.Newround(b.roundcnt, b.current)
+	currents := b.room.Newround()
+	d := currents[0]
 	b.pot = 0
 	b.board = []*card.Card{} //clear the board
+
+	data := map[string]interface{}{
+		"dealer": d.Idx, "round": b.roundcnt,
+	}
+	b.room.Sendactive("start", data)
 
 	//blinds
 	sb := currents[1]
@@ -127,12 +150,17 @@ func (b *Battle) round() {
 	sb.Addstakes(limit / 2)
 	bb.Addstakes(limit)
 
-	b.room.Sendstakes()
+	data = map[string]interface{}{
+		"bigblind": map[string]interface{}{"idx": bb.Idx, "num": limit},
+		"smallblind": map[string]interface{}{"idx": sb.Idx, "num": limit/2}
+	}
+	b.room.Sendactive("blinds", data)
+	
 	//deal cards
 	for _, p := range b.players {
 		p.Init()
 		b.deal(p, 2)
-		p.Sendcards()
+		p.Sendactive("cards", p.Cardmsg())
 	}
 
 	b.betround(currents, 2, limit)
@@ -292,4 +320,8 @@ func (b *Battle) betround(currents []*room.Player, head int, min int) int {
 
 func (b *Battle) Addpot(n int) {
 	b.pot += n
+}
+
+func (b *Battle) addstakes(p *room.Player, n int) {
+
 }

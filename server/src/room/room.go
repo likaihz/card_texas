@@ -1,40 +1,59 @@
- package room
+package room
 
 import (
-	"../battle"
-	"../card"
-	"../lib/xx"
-	"../lib/xxio"
+	// "../card"
+	"../lib/ws"
 	"fmt"
-	"log"
-	"os"
 	"strconv"
 	"sync"
 )
 
-const SEATS = 10
+const SEATNUM = 10
 
-type client chan<- string
+// type client chan<- string
 
 type Room struct {
 	sync.Mutex
 	players []*Player
+	playing bool
+	current int
 }
 
 func New() *Room {
 	r := &Room{}
-	r.players = make([]*Player, SEATS)
+	r.players = make([]*Player, SEATNUM)
 	return r
 }
 
 // interface
-func (r *Room) Enter(uid string, cli chan string) {
+func (r *Room) Connect(uid string, conn *ws.Conn) {
+	for _, p := range r.players {
+		if p.Is(uid) && p.Status == "active" {
+			p.Connect(conn)
+			return
+		}
+	}
+}
+
+func (r *Room) Enter(uid string, conn *ws.Conn) {
 	r.Lock()
 	defer r.Unlock()
 	for i, p := range r.players {
+		if p.Is(uid) {
+			p.Revive(conn)
+			r.players[i] = nil
+			r.Send("revive", p.Seatmsg())
+			r.players[i] = p
+			p.Send("seat", r.Msg())
+			return
+		}
+	}
+	for i, p := range r.players {
 		if p == nil {
-			r.players[i] = NewPlayer(i, uid, cli)
-			r.sendseat()
+			p = NewPlayer(i, uid, conn)
+			r.Send("enter", p.Seatmsg())
+			r.players[p.Idx] = p
+			p.Send("seat", r.Msg())
 			return
 		}
 	}
@@ -45,8 +64,15 @@ func (r *Room) Leave(uid string) bool {
 	defer r.Unlock()
 	for i, p := range r.players {
 		if p.Is(uid) {
-			r.players[i] = nil
-			r.sendseat()
+			var opt string
+			if r.playing && p.Active() {
+				p.Status = "escape"
+				opt = "escape"
+			} else {
+				r.players[i] = nil
+				opt = "leave"
+			}
+			r.Send(opt, p.Seatmsg())
 			break
 		}
 	}
@@ -56,61 +82,68 @@ func (r *Room) Leave(uid string) bool {
 func (r *Room) Ready(uid string) bool {
 	r.Lock()
 	defer r.Unlock()
-	ready := true
+	ok := true
+	if r.playing {
+		r.playing = false
+		r.roundover()
+		r.Send("over", r.Msg())
+	}
 	for i, p := range r.players {
 		if p == nil {
 			continue
 		}
 		if p.Is(uid) {
-			p.SetReady(true)
-			r.sendready(i)
+			p.Status = "active"
+			r.Send("ready", map[string]interface{}{"idx": p.Idx})
 		}
-		ready = ready && p.Ready()
+		ok = ok && p.Active()
 	}
-	return ready && r.occupancy() > 1
+	ok = ok && r.occupancy() > 1
+	if ok {
+		r.playing = true
+	}
+	return ok
 }
 
-func (r *Room) Newround(round int, dealer *Player) []*Player {
+func (r *Room) Newround() []*Player {
 	r.Lock()
 	defer r.Unlock()
-	currents := r.currents(dealer)
-	idx := dealer.Idx()
-	r.sendstart(idx, round)
+	r.current = r.Next(r.current)
+	currents := r.currents()
 	return currents
 }
 
-func (r *Room) Player(idx int) *Player {
-	if idx < 0 || idx >= SEATS {
-		return nil
-	}
-	return r.players[idx]
-}
-
-//对应徳扑中的下注动作，需要修改 ...
-func (r *Room) Setraise(player *Player, msg map[string]interface{}) {
-	idx := msg["idx"].(float64)
-	val := msg["raise"].(float64)
-	num := int(val)
-	player.SetRaise(num)
-	r.sendraise(int(idx), num)
-}
+// //对应徳扑中的下注动作，需要修改 ...
+// func (r *Room) Setraise(player *Player, msg map[string]interface{}) {
+// 	idx := msg["idx"].(float64)
+// 	val := msg["raise"].(float64)
+// 	num := int(val)
+// 	player.SetRaise(num)
+// 	r.sendraise(int(idx), num)
+// }
 
 func (r *Room) Enterable() bool {
-	return r.occupancy() < SEATS
+	return r.occupancy() < SEATNUM
 }
 
-func (r *Room) Next(player *Player) *Player {
-	idx := -1
-	if player != nil {
-		idx = player.Idx()
+func (r *Room) currents() []*Player {
+	d := r.current
+	arr := make([]*Player, 0)
+	arr = append(arr, d)
+	for p := r.Next(d.Idx); p != d; p = r.Next(p.Idx) {
+		arr = append(arr, p)
 	}
-	for i := 0; i < SEATS; i++ {
+	return arr
+}
+
+func (r *Room) Next(idx int) *Player {
+	for i := 0; i < SEATNUM; i++ {
 		idx++
-		if idx >= SEATS {
+		if idx >= SEATNUM {
 			idx = 0
 		}
 		p := r.players[idx]
-		if p.Ready() {
+		if p.Active() {
 			return p
 		}
 	}
@@ -118,94 +151,94 @@ func (r *Room) Next(player *Player) *Player {
 }
 
 // implementation
-func (r *Room) currents(dealer *Player) []*Player {
-	arr := make([]*Player, 0)
-	arr = append(arr, dealer)
-	dealer.Reset()
-	for p := r.Next(dealer); p != dealer; p = r.Next(p) {
-		arr = append(arr, p)
-	}
-	return arr
-}
-
-func (r *Room) occupancy() int {
-	cnt := 0
-	for _, p := range r.players {
-		if p != nil {
-			cnt++
-		}
-	}
-	return cnt
-}
 
 // interface of send
+// func (r *Room) Msg() map[string]interface{} {
+// 	msg := map[string]interface{}{}
+// 	for i, p := range r.players {
+// 		if p != nil {
+// 			j := strconv.Itoa(i)
+// 			msg[j] = p.Msg()
+// 		}
+// 	}
+// 	return msg
+// }
+
+func (r *Room) Send(opt string, data map[string]interface{}) {
+	for _, p := range r.players {
+		p.Send(opt, data)
+	}
+}
+
+func (r *Room) Sendactive(opt string, data map[string]interface{}) {
+	for _, p := range r.players {
+		p.Sendactive(opt, data)
+	}
+}
+
 func (r *Room) Msg() map[string]interface{} {
-	msg := map[string]interface{}{}
+	data := map[string]interface{}{}
+	if r.playing {
+		data["playing"] = "ok"
+	}
+	data["dealer"] = r.current
 	for i, p := range r.players {
 		if p != nil {
 			j := strconv.Itoa(i)
-			msg[j] = p.Msg()
+			data[j] = p.Seatmsg()
 		}
 	}
-	return msg
+	return data
 }
 
-func (r *Room) Send(msg map[string]interface{}) {
-	for _, p := range r.players {
-		if p != nil {
-			p.Send(msg)
-		}
-	}
-}
-
-func (r *Room) Sendresult() {
-	msg := map[string]interface{}{
-		"opt": "result",
-	}
-	msg["data"] = r.Msg()
-	r.Send(msg)
-}
+// func (r *Room) Sendresult() {
+// 	msg := map[string]interface{}{
+// 		"opt": "result",
+// 	}
+// 	msg["data"] = r.Msg()
+// 	r.Send(msg)
+// }
 
 //广播所有人的下注 ...
-func (r *Room) Sendstakes() {
-	msg := map[string]interface{
-		"opt": "stakes",
-	}
+// func (r *Room) Sendstakes() {
+// 	msg := map[string]interface{
+// 		"opt": "stakes",
+// 	}
 
-	smsg := map[string]interface{}{}
-	for i, p:=range r.players {
-		if p != nil {
-			j := strconv.Itoa(i)
-			msg[j] = p.stakes
-		}
-	}
-	msg["data"] = smsg
-	r.Send(msg)
-}
+// 	smsg := map[string]interface{}{}
+// 	for i, p:=range r.players {
+// 		if p != nil {
+// 			j := strconv.Itoa(i)
+// 			msg[j] = p.stakes
+// 		}
+// 	}
+// 	msg["data"] = smsg
+// 	r.Send(msg)
+// }
 
 //broadcast the board to all players
-func (r *Room) Sendboard(board []*card.Card) {
-	msg := map[string]interface{}{}
-	msg["opt"] = "board"
-	cmsg := map[string]interface{}{}
-	for i, c := range board {
-		cmsg[strconv.Itoa(i)] = c.Msg()
-	}
-	msg["data"] = cmsg
-	r.Send(msg, "all")
-}
+// func (r *Room) Sendboard(board []*card.Card) {
+// 	msg := map[string]interface{}{}
+// 	msg["opt"] = "board"
+// 	cmsg := map[string]interface{}{}
+// 	for i, c := range board {
+// 		cmsg[strconv.Itoa(i)] = c.Msg()
+// 	}
+// 	msg["data"] = cmsg
+// 	r.Send(msg, "all")
+// }
 
-func (r *Room) Sendactions(uid string, act string, data int) {
-	msg := map[string]interface{}{}
-	msg["opt"] = "actions"
-	amsg := map[string]interface{}{}
-	amsg["uid"] = uid
-	amsg["act"] = act
-	amsg["data"] = strconv.Itoa(data)
-	msg["data"] = amsg
+// func (r *Room) Sendactions(uid string, act string, data int) {
+// 	msg := map[string]interface{}{}
+// 	msg["opt"] = "actions"
+// 	amsg := map[string]interface{}{}
+// 	amsg["uid"] = uid
+// 	amsg["act"] = act
+// 	amsg["data"] = strconv.Itoa(data)
+// 	msg["data"] = amsg
 
-	r.Send(msg, "all")
-}
+// 	r.Send(msg, "all")
+// }
 
 func (r *Room) sendseat() {
 	msg := map[string]interface{}{
@@ -244,4 +277,27 @@ func (r *Room) sendraise(idx, raise int) {
 	msg["idx"] = idx
 	msg["raise"] = raise
 	r.Send(msg)
+}
+
+// implementation
+func (r *Room) roundover() {
+	for i, p := range r.players {
+		if p != nil {
+			if p.Status == "escape" || !p.Connected() {
+				r.players[i] = nil
+			} else {
+				p.Init()
+			}
+		}
+	}
+}
+
+func (r *Room) occupancy() int {
+	cnt := 0
+	for _, p := range r.players {
+		if p != nil {
+			cnt++
+		}
+	}
+	return cnt
 }
