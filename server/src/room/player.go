@@ -20,6 +20,7 @@ type Player struct {
 	cards         *card.Cards
 	Chips, Stakes int //chips是玩家拥有的筹码，stakes是下的赌注
 	Status        string
+	Action        string
 }
 
 func NewPlayer(idx int, uid string, conn *ws.Conn) *Player {
@@ -42,6 +43,7 @@ func (p *Player) Debug() {
 
 func (p *Player) Init() {
 	p.Status = "waiting"
+	p.Folded = false
 	p.cards = card.NewCards()
 	p.stakes = 0
 }
@@ -77,13 +79,20 @@ func (p *Player) Active() bool {
 	return p.Status == "active"
 }
 
+func (p *Player) Folded() bool {
+	return p.Action == "fold"
+}
+
+func (p *Player) Allin() bool {
+	return p.Action == "allin"
+}
+
 func (p *Player) Rank() int {
 	return p.cards.Rank()
 }
 
 func (p *Player) Fold() {
-	p.Status = "fold"
-
+	p.Action = "fold"
 }
 
 func (p *Player) Addstakes(s int) int {
@@ -161,30 +170,12 @@ func (p *Player) Sendactive(opt string, data map[string]interface{}) {
 	}
 }
 
-// func (p *Player) Sendcard(c *card.Card) {
-// 	msg := map[string]interface{}{}
-// 	msg["opt"] = "card"
-// 	msg["data"] = c.Msg()
-// 	p.Send(msg)
-// }
-
-// func (p *Player) Sendcards() {
-// 	msg := map[string]interface{}{}
-// 	msg["opt"] = "cards"
-// 	msg["data"] = p.cards.Msg()
-// 	p.Send(msg)
-// }
-
 func (p *Player) Stakeover() int {
 	c := p.chips
 	p.chips = 0
 	return c
 
 }
-
-// func (p *Player) Sendpermissions(act ...string) {
-// 	//...
-// }
 
 // implementation
 func getname(uid string) (string, error) {

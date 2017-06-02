@@ -113,15 +113,6 @@ func (r *Room) Newround() []*Player {
 	return currents
 }
 
-// //对应徳扑中的下注动作，需要修改 ...
-// func (r *Room) Setraise(player *Player, msg map[string]interface{}) {
-// 	idx := msg["idx"].(float64)
-// 	val := msg["raise"].(float64)
-// 	num := int(val)
-// 	player.SetRaise(num)
-// 	r.sendraise(int(idx), num)
-// }
-
 func (r *Room) Enterable() bool {
 	return r.occupancy() < SEATNUM
 }

@@ -6,6 +6,7 @@ import (
 	"../lib/xx"
 	"../room"
 	"fmt"
+	"strconv"
 )
 
 var limit = 100 //注限
@@ -109,7 +110,7 @@ func (b *Battle) Setconfig(data map[string]interface{}) bool {
 	data["roomnum"] = b.number
 	b.config = data
 	b.mode = data["mode"].(string)
-	b.turning = data["turning"].(string)
+	// b.turning = data["turning"].(string)
 	b.roundnum = data["roundnum"].(int)
 	return true
 }
@@ -163,26 +164,36 @@ func (b *Battle) round() {
 		p.Sendactive("cards", p.Cardmsg())
 	}
 
-	b.betround(currents, 2, limit)
-
-	//flop round
-	for i := 0; i < 3; i++ {
-		board[i] = b.popcard()
+	//pre-flop
+	ended := b.betround("preflop", currents, limit)
+	if ended == 0 {
+		//flop round
+		for i := 0; i < 3; i++ {
+			board[i] = b.popcard()
+		}
+		b.sendboard()
+		ended = b.betround("flop", currents, 0)
+		if ended == 0 {
+			//turn
+			board[3] = b.popcard()
+			b.sendboard()
+			ended = b.betround("turn", currents, 0)
+			if ended == 0 {
+				//river
+				board[4] = b.popcard()
+				b.sendboard()
+				ended = b.betround("river", currents, 0)
+			}
+		}
 	}
-	b.room.Sendboard(board)
-	b.betround(currents, 1, 0)
 
-	//turn
-	board[3] = b.popcard()
-	b.room.Sendboard(board)
-	b.betround(currents, 1, 0)
+	switch ended {
+	case 1:
+		//翻出所有公共牌并比大小 ...
+	case 2:
+		//奖池中的全部筹码归唯一没有弃牌的玩家 ...
+	}
 
-	//river
-	board[4] = b.popcard()
-	b.sendboard()
-	b.betround(currents, 1, 0)
-
-	b.room.Received()
 	if b.round >= b.roundnum {
 		b.End()
 	}
@@ -194,14 +205,6 @@ func (b *Battle) compare(p1, p2 *Player) {
 	} else {
 		b.addscore(p2, p1)
 	}
-}
-
-func (b *Battle) addscore(p1, p2 *Player) {
-	r := p1.Raise() * p2.Raise()
-	cards := p1.Cards()
-	s := cards.Price(b.mode) * r
-	p1.Addscore(s)
-	p2.Addscore(-s)
 }
 
 func (b *Battle) popcard() *card.Card {
@@ -216,85 +219,65 @@ func (b *Battle) deal(player *Player, num int) {
 	player.Sendcards()
 }
 
-func (b *Battle) next(c int) int {
-	b.room.Received()
-	num := len(b.room.Seat())
-	next := -1
-	for i := c + 1; next < 0; i++ {
-		i = i % num
-		if b.players[i] != nil {
-			next = i
-		}
-	}
-	return next
-}
-
-func (b *Battle) dealer() *room.Player {
-	old := b.current
-	return b.room.Next(old)
-}
-
-func (b *Battle) betround(currents []*room.Player, head int, min int) int {
-	//用返回值表示下注回合是否结束，结束的情况有两种：所有人都all in或者只剩下一个人没有弃牌
+func (b *Battle) betround(round string, currents []*room.Player) {
+	//用返回值表示下注回合是否结束
 	//head参数并不是真正的最先行动的人，要首先确定其没有弃牌
-	//...
 
 	//首先找到真正的head
-	for currents[head].Folded() {
-		head++
+	var head, crt, min int
+	if round == "preflop" {
+		head = 2
+		crt = next(head, currents)
+		min = limit
 	}
-	crt := head
-	//处理pre-flop round中的特殊情况,直接跳过大盲注位
-	for currents[crt].fold() || currents[head].Stakes() == min && min != 0{
-		crt++
+	else {
+		crt = next(0, currents)
+		head = -1
+		min = 0
 	}
-	for {
+	for ; ; crt = next(crt, currents) {
 		//首先确定当前玩家能够进行的动作
-		s := currents[crt].Stakes()
-		c := currents[crt].Chips()
-		if crt == head && min != 0 {
-			//一圈下注已经结束，回到第一个下注的人
-			//当前玩家可以选择看牌、加注、全下（假设，实际的规则还要复杂得多）...
-			currents[crt].Sendpermissions("check", "raise", "allin")
+		s := currents[crt].Stakes
+		c := currents[crt].Chips
+		var data map[string]interface{}
+		if crt == head {
+			//一圈下注已经结束，回到第一个下(加)注的人，那么该轮下注结束
+			break
 		} else if s >= min {
 			//当前玩家能够选择看牌、加注、弃牌、全下
-			currents[crt].Sendpermissions("check", "raise", "allin", "fold")
+			data = permsg("check", "raise", "allin", "fold")
 		} else if min-s >= c {
 			//可以弃牌、全下
-			currents[crt].Sendpermissions("allin", "fold")
+			data = permsg("allin", "fold")
 		} else {
 			//可以跟注、加注、弃牌、全下
-			currents[crt].Sendpermissions("call", "fold", "raise", "allin")
+			data = permsg("call", "fold", "raise", "allin")
 		}
+		currents[crt].Sendactive("permisssions", data)
 		//接收玩家的身份信息uid操作信息act
-		msg:=b.receive("actions")
+		msg := b.receive("actions")
 		uid := msg["uid"].(string)
-		for uid != currents[crt].Uid() {
+		for uid != currents[crt].Uid {
 			msg = b.receive("actions")
 			uid = msg["uid"].(string)
 		}
 		act := msg["act"].(string)
-		fdata := msg["data"].(float64)
-		data := int(fdata)
+		fnum := msg["num"].(float64)
+		num := int(fdata)
 		switch act {
 		case "call":
 			//跟注
 			currents[crt].Call(min)
-			data = min
+			num = min
 		case "raise":
 			//加注，更新head
-			data = min+data
-			currents[crt].Raise(data)
+			currents[crt].Raise(sdata, min)
+			sdata += min
 			head = crt
 		case "fold":
-			//弃牌，如果是head弃牌也要更新head
+			//弃牌
 			currents[crt].Fold()
 			b.Addpot(s)
-			if crt == head {
-				for currents[head].Fold() {
-					head ++
-				}
-			}
 		case "allin":
 			//全下
 			currents[crt].All_in()
@@ -302,19 +285,42 @@ func (b *Battle) betround(currents []*room.Player, head int, min int) int {
 		case "check":
 			//看牌,好像没什么做的？
 		}
-
 		//将当前玩家的动作广播给所有玩家
-		b.room.Sendactions(uid, act, data)
-		//判断该轮下注是否结束
-		if act == "check" && crt == head {
-			break
-		}
-
-		crt = b.next(crt)
+		b.sendactions(uid, act, data)
 	}
-	//判断之后是否还需要继续下一轮下注 ...
-
-	//将所有人的下注加到奖池中，并广播 ...
+	//将所有人的下注加到奖池中，并广播该轮下注结束后奖池数量以及每个玩家剩下的筹码
+	chips := map[string]interface{}{}
+	for _, p := range currents {
+		if p.Active() && !p.Folded() {
+			b.Addpot(p.Stakes)
+			p.Stakes = 0
+			chips[p.Uid] = p.Chips
+		}
+	}
+	data = map[string]interface{}{"pot": pot, "chips": chips}
+	b.room.Sendactive("pot", data)
+	//判断之后是否还需要继续下一轮下注
+	//结束的情况有两种：所有人都all in或者只剩下一个人没有弃牌
+	all_allin := true
+	not_fold := 0
+	for _, p := range currents {
+		if p.Active() {
+			if !p.Allin() {
+				all_allin = false
+			}
+			if !p.Folded() {
+				not_fold ++
+			}
+		}
+	}
+	
+	if all_allin || round == "river"{
+		return 1
+	}
+	if not_fold == 1 {
+		return 2
+	}
+	return 0
 }
 
 
@@ -324,4 +330,44 @@ func (b *Battle) Addpot(n int) {
 
 func (b *Battle) addstakes(p *room.Player, n int) {
 
+}
+
+func (b *Battle) sendactions(uid string, act string, num int) {
+	data := map[string]interface{}{}
+	data["uid"] = uid
+	data["action"] = act
+	data["num"] = strconv.Itoa(num)
+	b.room.Sendactive("actions", data)
+}
+
+func (b *Battle) sendboard() {
+	data := map[string]interface{}{}
+	if len(board) != 0{
+		for i, e := range board {
+			s := strconv.Itoa(i)
+			data[s] = e.Msg()
+		}
+	}
+	b.room.Sendactive("board", data)
+}
+
+func next(c int, currents []*room.Player) int {
+	num = len(currents)
+	next := -1
+	for i := c + 1; next < 0; i++ {
+		i = i % num
+		if currents[i].Status == "active" && !currents[i].Folded() {
+			next = i
+		}
+	}
+	return next
+}
+
+func permsg(p ...string) map[string]interface{} {
+	data := map[string]interface{}{}
+	for i, s := range p {
+		j := strconv.Itoa(i)
+		data[j] = s
+	}
+	return data
 }

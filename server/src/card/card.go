@@ -1,9 +1,9 @@
 package card
 
-import (
-	"fmt"
-	"strconv"
-)
+// import (
+// 	"fmt"
+// 	"strconv"
+// )
 
 var card_cls = map[string]int{
 	"heart": 3, "spade": 4, "diamond": 1, "club": 2,
