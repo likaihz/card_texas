@@ -24,6 +24,48 @@ func Map2str(m map[string]interface{}) string {
 	return string(buf)
 }
 
+func Getstring(msg map[string]interface{}, k string) (bool, string) {
+	val, ok := msg[k]
+	if !ok {
+		fmt.Println("unexist key in msg: ", k)
+		return false, ""
+	}
+	str, ok := val.(string)
+	if !ok {
+		fmt.Printf("value of \"%s\" in not a string!!\n", k)
+		return false, ""
+	}
+	return true, str
+}
+
+func Getnumber(msg map[string]interface{}, k string) (bool, float64) {
+	val, ok := msg[k]
+	if !ok {
+		fmt.Println("unexist key in msg: ", k)
+		return false, 0
+	}
+	num, ok := val.(float64)
+	if !ok {
+		fmt.Println("value of \"%s\" in not a number!!", k)
+		return false, 0
+	}
+	return true, num
+}
+
+func Getmap(msg map[string]interface{}, k string) (bool, map[string]interface{}) {
+	val, ok := msg[k]
+	if !ok {
+		fmt.Println("unexist key in msg: ", k)
+		return false, nil
+	}
+	tbl, ok := val.(map[string]interface{})
+	if !ok {
+		fmt.Println("value of \"%s\" in not a map!!", k)
+		return false, nil
+	}
+	return true, tbl
+}
+
 func Restrict(num, a, b float64) float64 {
 	if num < a {
 		return a

@@ -3,17 +3,18 @@ package room
 import (
 	"../card"
 	"../lib/ws"
-	"../lib/xx"
 	"../lib/xxio"
 	"fmt"
 	"strconv"
 	"sync"
 )
 
+//玩家在进入房间时自动买入筹码的数目
+const INITCHIPS = 1000
+
 // class Player
 type Player struct {
 	sync.Mutex
-	// ready         bool
 	conn          *ws.Conn
 	Idx           int
 	Uid, Name     string
@@ -30,8 +31,7 @@ func NewPlayer(idx int, uid string, conn *ws.Conn) *Player {
 		return nil
 	}
 	p.Name = name
-	// p.fold = false
-	p.Connect(conn)
+	p.Connect(conn, 0)
 	p.Init()
 	return p
 }
@@ -43,9 +43,11 @@ func (p *Player) Debug() {
 
 func (p *Player) Init() {
 	p.Status = "waiting"
-	p.Folded = false
+	p.conn.Empty(false)
 	p.cards = card.NewCards()
-	p.stakes = 0
+	p.Stakes = 0
+	//进入房间时系统自动为玩家买入筹码 ...
+	p.Chips = INITCHIPS
 }
 
 func (p *Player) Connected() bool {
@@ -95,15 +97,17 @@ func (p *Player) Fold() {
 	p.Action = "fold"
 }
 
+//下注
 func (p *Player) Addstakes(s int) int {
-	p.stakes += s
-	return p.stakes
+	p.Stakes += s
+	return p.Stakes
 }
 
+//全下，返回值为全下的金额
 func (p *Player) All_in() int {
-	c := p.chips
-	p.chips -= c
-	p.stakes += c
+	c := p.Chips
+	p.Chips -= c
+	p.Stakes += c
 	p.Status = "allin"
 	return c
 }
@@ -121,31 +125,37 @@ func (p *Player) Compare(player *Player) int {
 	return p.cards.Compare(cards)
 }
 
+// 买入筹码
+func (p *Player) Addchips(n int) {
+	p.Chips += n
+}
+
+func (p *Player) Call(n int) {
+	p.Stakes += n
+}
+func (p *Player) Raise() {
+
+}
+
 // interface of net
 func (p *Player) Seatmsg() map[string]interface{} {
 	data := map[string]interface{}{}
 	data["idx"] = p.Idx
 	data["name"] = p.Name
-	data["score"] = p.Score
+	data["chips"] = p.Chips
 	data["status"] = p.Status
 	return data
 }
 
 func (p *Player) Cardmsg() map[string]interface{} {
-	data := map[string]interface{}{}
+	//data := map[string]interface{}{}
 	cards := p.cards
-	data["cards"] = cards.Msg()
-	rank := cards.Rank()
-	if rank != "" {
-		data["rank"] = rank
-		data["addscore"] = p.addscore
-	}
-	return data
+	return cards.Msg()
 }
 
-func (p *Player) Connect(conn *ws.Conn) {
-	p.conn = conn.Reload(p.conn)
-	p.conn.Send(nil)
+func (p *Player) Connect(conn *ws.Conn, ptr int) {
+	p.conn = conn.Replace(p.conn)
+	p.conn.Resend(ptr)
 }
 
 func (p *Player) Disconnect() {
@@ -170,13 +180,6 @@ func (p *Player) Sendactive(opt string, data map[string]interface{}) {
 	}
 }
 
-func (p *Player) Stakeover() int {
-	c := p.chips
-	p.chips = 0
-	return c
-
-}
-
 // implementation
 func getname(uid string) (string, error) {
 	cfg, err := xxio.Read("user")
@@ -198,9 +201,9 @@ func (p *Player) Print() {
 	if p == nil {
 		s += "none"
 	} else {
-		idx := strconv.Itoa(p.idx)
+		idx := strconv.Itoa(p.Idx)
 		s += idx + " : "
-		s += p.name
+		s += p.Name
 		s += " " + p.Status
 	}
 	fmt.Println(s)

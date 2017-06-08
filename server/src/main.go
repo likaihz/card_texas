@@ -1,149 +1,166 @@
 package main
 
 import (
-	//"./lib/xx"
-	//"./match"
-	"./test"
-	"flag"
-	//"fmt"
-	//"log"
-	//"net/http"
-	//"net/websocket"
-	//"os"
+	"./battle"
+	"./lib/ws"
+	"./lib/xx"
+	"fmt"
+	"net/websocket"
 )
 
-// var rooms *match.Groups
-// var player map[string](chan string)
-
-// var lg *log.Logger
-// var file *os.File
+var match *battle.Match
+var players map[string]*ws.Conn
 
 func main() {
-	flag.Parse()
-	var args []string = flag.Args()
-	if len(args) == 0 {
-		// lg, file = xx.Log2file("main.log")
-		// rooms = match.NewGroups(1000)
-		// player = map[string](chan string){}
-		// http.Handle("/receive", websocket.Handler(receive))
-		// err := http.ListenAndServe(":8000", nil)
-		// if err != nil {
-		// 	panic("ListenAndServe: " + err.Error())
-		return
-		//}
-	} else if args[0] == "cardtest" {
-		test.CardTest()
-	} else if args[0] == "comparetest" {
-		test.CompareTest()
+	match = battle.NewMatch(2000)
+	players = map[string]*ws.Conn{}
+	// battle.Test()
+	ws.Listen("8000", "/receive", receive)
+}
+
+func receive(c *websocket.Conn) {
+	conn := ws.New(c)
+	defer conn.Close()
+	ok := true
+	var b *battle.Battle
+	for ok {
+		msg, opt := conn.Receive()
+		if msg == nil {
+			break
+		}
+		switch opt {
+		case "heartbeat":
+			break
+		case "connect":
+			ok, b = connect(msg, conn)
+		case "create":
+			ok, b = create(msg, conn)
+		case "access":
+			ok, b = access(msg, conn)
+		case "invite":
+			ok = invite(msg, b.Number())
+		default:
+			ok = b.Received(msg, conn)
+		}
 	}
 }
 
-// func receive(conn *websocket.Conn) {
-// 	defer conn.Close()
-// 	ch := make(chan string)
-// 	go send(conn, ch)
+func connect(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
+	ok, cnn := xx.Getstring(msg, "connect")
+	if !ok {
+		return false, nil
+	}
+	uid := msg["uid"].(string)
+	if cnn == "off" {
+		delete(players, uid)
+		return false, nil
+	}
+	ok, b := checkroom(msg, conn)
+	if !ok {
+		return false, nil
+	}
+	players[uid] = conn
+	return true, b
+}
 
-// 	var e match.Receptor
-// 	for {
-// 		var req string
-// 		err := websocket.Message.Receive(conn, &req)
-// 		if err != nil {
-// 			fmt.Println(err)
-// 			break
-// 		}
-// 		msg := xx.Str2map(req)
-// 		opt := msg["opt"].(string)
-// 		switch opt {
-// 		case "connect":
-// 			if !connect(msg, ch) {
-// 				return
-// 			}
-// 			break
-// 		case "create":
-// 			e = create(msg, ch)
-// 			break
-// 		case "leave":
-// 			leave(msg, ch, e)
-// 			break
-// 		case "invite":
-// 			invite(msg, e)
-// 			break
-// 		case "accept":
-// 			e = accept(msg, ch)
-// 			break
-// 		case "access":
-// 			e = access(msg, ch)
-// 			break
-// 		case "dismiss":
-// 			// ...
-// 			break
-// 		default:
-// 			e.Receive(msg)
-// 		}
-// 	}
-// }
+func checkroom(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
+	ok, inroom := xx.Getstring(msg, "inroom")
+	if !ok {
+		return false, nil
+	}
+	if inroom == "no" {
+		return true, nil
+	}
+	ok, val := xx.Getnumber(msg, "roomnum")
+	if !ok {
+		return false, nil
+	}
+	num := int(val)
+	b := match.Get(num)
+	if b == nil {
+		conn.Send(map[string]interface{}{
+			"opt": "out",
+		})
+	} else {
+		ok := b.Connect(msg, conn)
+		if !ok {
+			return false, nil
+		}
+	}
+	return true, b
+}
 
-// func send(conn *websocket.Conn, ch <-chan string) {
-// 	for msg := range ch {
-// 		err := websocket.Message.Send(conn, msg)
-// 		if err != nil {
-// 			lg.Println(err)
-// 			break
-// 		}
-// 	}
-// }
+func create(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
+	b := match.Create()
+	if b == nil {
+		senderror(conn, "fail")
+		return true, nil
+	}
+	ok, data := xx.Getmap(msg, "config")
+	if !ok {
+		return false, nil
+	}
+	ok = b.Setconfig(data)
+	if !ok {
+		senderror(conn, "fail")
+		return false, nil
+	}
+	data = b.Getconfig()
+	sendconfig(conn, data)
+	go b.Run()
+	return true, b
+}
 
-// func connect(msg map[string]interface{}, ch chan string) bool {
-// 	uid := msg["uid"].(string)
-// 	open := msg["open"].(string)
-// 	if open == "on" {
-// 		player[uid] = ch
-// 		return true
-// 	}
-// 	delete(player, uid)
-// 	return false
-// }
+func access(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
+	ok, val := xx.Getnumber(msg, "roomnum")
+	if !ok {
+		senderror(conn, "unexist")
+		return false, nil
+	}
+	num := int(val)
+	b := match.Get(num)
+	if b == nil {
+		senderror(conn, "unexist")
+		return true, nil
+	}
+	if !b.Enterable() {
+		senderror(conn, "full")
+		return true, nil
+	}
+	data := b.Getconfig()
+	sendconfig(conn, data)
+	return true, b
+}
 
-// func create(msg map[string]interface{}, ch chan string) match.Receptor {
-// 	uid := msg["uid"].(string)
-// 	e := rooms.Create(uid, ch)
-// 	e.SetConfig(msg)
-// 	return e
-// }
+func invite(msg map[string]interface{}, roomnum int) bool {
+	if roomnum < 0 {
+		return true
+	}
+	ok, who := xx.Getstring(msg, "who")
+	if !ok {
+		return false
+	}
+	uid := msg["uid"].(string)
+	delete(msg, "uid")
+	msg["who"] = uid
+	msg["roomnum"] = roomnum
+	conn := players[who]
+	conn.Send(msg)
+	return true
+}
 
-// func leave(msg map[string]interface{}, ch chan string, e match.Receptor) {
-// 	uid := msg["uid"].(string)
-// 	e.Leave(uid, ch)
-// 	if e.Occupancy() == 0 {
-// 		rooms.Remove(e)
-// 	}
-// }
+// implementation
+func senderror(conn *ws.Conn, err string) {
+	msg := map[string]interface{}{
+		"opt": "front", "status": err,
+	}
+	conn.Send(msg)
+}
 
-// func invite(msg map[string]interface{}, e match.Receptor) {
-// 	who := msg["who"].(string)
-// 	msg["idx"] = e.Index()
-// 	msg["who"] = "xxx"
-// 	friend := player[who]
-// 	friend <- xx.Map2str(msg)
-// }
-
-// func accept(msg map[string]interface{}, ch chan string) match.Receptor {
-// 	uid := msg["uid"].(string)
-// 	idx := msg["idx"].(float64)
-// 	e := rooms.Get(int(idx))
-// 	if e != nil {
-// 		e.Enter(uid, ch)
-// 	}
-// 	return e
-// }
-
-// func access(msg map[string]interface{}, ch chan string) match.Receptor {
-// 	e := rooms.Pop()
-// 	if e != nil {
-// 		uid := msg["uid"].(string)
-// 		e.Enter(uid, ch)
-// 	} else {
-// 		e = create(msg, ch)
-// 	}
-// 	return e
-// }
+func sendconfig(conn *ws.Conn, data map[string]interface{}) {
+	msg := map[string]interface{}{
+		"opt": "front", "status": "ok",
+	}
+	msg["data"] = data
+	conn.Send(msg)
+}

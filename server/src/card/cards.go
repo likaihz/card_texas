@@ -103,6 +103,7 @@ func (c *Cards) Compare(cards *Cards) int {
 	return c.Rudecompare(cards)
 }
 
+// 从多张牌中找出最大的五张牌组合
 func (c *Cards) CombinationTraversal() *Cards {
 	n := len(c.arr)
 	if n < 5 {
@@ -172,15 +173,15 @@ func Remove(arr []*Card, i int) []*Card {
 	return arr[:len(arr)-1]
 }
 
-func Pop(arr []*Card) *Card {
+func Pop(arr []*Card) ([]*Card, *Card) {
 	num := len(arr)
 	if num <= 0 {
-		return nil
+		return arr, nil
 	}
 	i := rand.Intn(num)
 	c := arr[i]
 	arr = Remove(arr, i)
-	return c
+	return arr, c
 }
 
 // implementation
