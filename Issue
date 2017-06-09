@@ -1,0 +1,7 @@
+Issue：
+Player.Cardmsg()
+Player.Init():　玩家在进入房间时系统自动买入一定量的筹码，但是放在这个函数里面好像是错的
+
+Room.Connect()
+Room.Newround()
+Room.dealer()

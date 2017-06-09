@@ -4,7 +4,6 @@ import (
 	"./battle"
 	"./lib/ws"
 	"./lib/xx"
-	"fmt"
 	"net/websocket"
 )
 

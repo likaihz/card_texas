@@ -1,0 +1,14 @@
+{
+	"1": {
+		"opt": "connect",
+		"uid": "100001",
+		"connect": "on",
+		"inroom": "no"
+	},
+	"2": {
+		"opt":"heartbeat"
+	},
+	"3": {
+		""
+	}
+}

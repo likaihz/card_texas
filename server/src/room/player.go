@@ -133,8 +133,8 @@ func (p *Player) Addchips(n int) {
 func (p *Player) Call(n int) {
 	p.Stakes += n
 }
-func (p *Player) Raise() {
-
+func (p *Player) Raise(b, n int) {
+	p.Stakes += (b + n)
 }
 
 // interface of net

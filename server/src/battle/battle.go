@@ -246,7 +246,7 @@ func (b *Battle) round() bool {
 	case 2:
 		//奖池中的全部筹码归唯一没有弃牌的玩家 ...
 		var winner *room.Player
-		for i, p := range currents {
+		for _, p := range currents {
 			if p.Active() && !p.Folded() {
 				winner = p
 				break
@@ -331,8 +331,8 @@ func (b *Battle) betround(round string, currents []*room.Player) int {
 			num = min
 		case "raise":
 			//加注，更新head
-			currents[crt].Raise(sdata, min)
-			sdata += min
+			currents[crt].Raise(num, min)
+			num += min
 			head = crt
 		case "fold":
 			//弃牌
@@ -341,12 +341,12 @@ func (b *Battle) betround(round string, currents []*room.Player) int {
 		case "allin":
 			//全下
 			currents[crt].All_in()
-			data = c
+			num = c
 		case "check":
 			//看牌,好像没什么做的？
 		}
 		//将当前玩家的动作广播给所有玩家
-		b.sendactions(uid, act, data)
+		b.sendactions(uid, act, num)
 	}
 	//将所有人的下注加到奖池中，并广播该轮下注结束后奖池数量以及每个玩家剩下的筹码
 	chips := map[string]interface{}{}
@@ -357,7 +357,7 @@ func (b *Battle) betround(round string, currents []*room.Player) int {
 			chips[p.Uid] = p.Chips
 		}
 	}
-	data = map[string]interface{}{"pot": b.pot, "chips": chips}
+	data := map[string]interface{}{"pot": b.pot, "chips": chips}
 	b.room.Sendactive("pot", data)
 	//判断之后是否还需要继续下一轮下注
 	//结束的情况有两种：所有人都all in或者只剩下一个人没有弃牌
@@ -401,7 +401,7 @@ func (b *Battle) sendactions(uid string, act string, num int) {
 
 func (b *Battle) sendboard(n int) {
 	data := map[string]interface{}{}
-	tmp = board[:n]
+	tmp := b.board[:n]
 	if len(tmp) != 0 {
 		for i, e := range tmp {
 			s := strconv.Itoa(i)
@@ -412,7 +412,7 @@ func (b *Battle) sendboard(n int) {
 }
 
 func next(c int, currents []*room.Player) int {
-	num = len(currents)
+	num := len(currents)
 	next := -1
 	for i := c + 1; next < 0; i++ {
 		i = i % num
@@ -432,15 +432,15 @@ func permsg(p ...string) map[string]interface{} {
 	return data
 }
 
-func winner(currents []*Player) []*Player {
+func winner(currents []*room.Player) []*room.Player {
 	//winner := currents[0]
-	winner := []*Player{currents[0]}
-	for i, p := range currents[1:] {
+	winner := []*room.Player{currents[0]}
+	for _, p := range currents[1:] {
 		rst := p.Compare(winner[0])
 		if rst == 0 {
 			winner = append(winner, p)
 		} else if rst > 0 {
-			winner = []*Player{p}
+			winner = []*room.Player{p}
 		}
 	}
 	return winner
