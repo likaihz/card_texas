@@ -4,18 +4,17 @@ import (
 	"../xxtea"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
-	// "strings"
 )
 
 // create error infomation
 func Error(out bool, fn, info string, err error) error {
-	txt := fn + " failed"
+	txt := fn
 	if info != "" {
-		txt += " in " + info
+		txt += info + ": "
 	}
-	txt += ": "
 	err = fmt.Errorf(txt, err)
 	if out {
 		fmt.Println(err)
@@ -23,13 +22,30 @@ func Error(out bool, fn, info string, err error) error {
 	return err
 }
 
-func Request(r *http.Request) (map[string]interface{}, error) {
+func Decode(r io.Reader) (map[string]interface{}, error) {
+	body, err := ioutil.ReadAll(r)
+	if err != nil {
+		fmt.Println("reading err: ", err)
+		return nil, err
+	}
+	data := map[string]interface{}{}
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		fmt.Println("decoding err: ", err)
+		return nil, err
+	}
+	return data, nil
+}
+
+func Request(r *http.Request, crypt bool) (map[string]interface{}, error) {
 	body, err := ioutil.ReadAll(r.Body)
 	defer r.Body.Close()
 	if err != nil {
 		return nil, xxerr("Request", "read", err)
 	}
-	body = xxtea.Decrypt(body, []byte("玄襄科技"))
+	if crypt {
+		body = xxtea.Decrypt(body, []byte("玄襄科技"))
+	}
 	data := map[string]interface{}{}
 	err = json.Unmarshal(body, &data)
 	if err != nil {
@@ -39,12 +55,14 @@ func Request(r *http.Request) (map[string]interface{}, error) {
 }
 
 // response net infomation
-func Response(w http.ResponseWriter, res *map[string]interface{}) error {
+func Response(w http.ResponseWriter, res *map[string]interface{}, crypt bool) error {
 	data, err := json.Marshal(*res)
 	if err != nil {
 		return xxerr("Response", "marshal", err)
 	}
-	data = xxtea.Encrypt(data, []byte("玄襄科技"))
+	if crypt {
+		data = xxtea.Encrypt(data, []byte("玄襄科技"))
+	}
 	w.Write(data)
 	return nil
 }
@@ -90,7 +108,7 @@ func Update(client map[string]interface{}, res *map[string]interface{}) error {
 
 // -- implementation --
 func getpath(name string) string {
-	return "../data/" + name + ".json"
+	return "./data/" + name + ".json"
 }
 
 func xxerr(fn, info string, err error) error {

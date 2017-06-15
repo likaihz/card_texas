@@ -46,7 +46,7 @@ func Getnumber(msg map[string]interface{}, k string) (bool, float64) {
 	}
 	num, ok := val.(float64)
 	if !ok {
-		fmt.Println("value of \"%s\" in not a number!!", k)
+		fmt.Printf("value of \"%s\" in not a number!!\n", k)
 		return false, 0
 	}
 	return true, num

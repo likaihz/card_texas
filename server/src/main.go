@@ -2,6 +2,7 @@ package main
 
 import (
 	"./battle"
+	"./lib/user"
 	"./lib/ws"
 	"./lib/xx"
 	"net/websocket"
@@ -90,6 +91,12 @@ func checkroom(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle)
 }
 
 func create(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
+	uid := msg["uid"].(string)
+	ok := user.Checkroomcard(uid)
+	if !ok {
+		senderror(conn, "lack")
+		return false, nil
+	}
 	b := match.Create()
 	if b == nil {
 		senderror(conn, "fail")
@@ -99,7 +106,7 @@ func create(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
 	if !ok {
 		return false, nil
 	}
-	ok = b.Setconfig(data)
+	ok = b.Setconfig(data, uid)
 	if !ok {
 		senderror(conn, "fail")
 		return false, nil

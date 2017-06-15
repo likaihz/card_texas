@@ -2,7 +2,9 @@ package room
 
 import (
 	"../card"
+	"../lib/user"
 	"../lib/ws"
+	"../lib/xx"
 	"../lib/xxio"
 	"fmt"
 	"strconv"
@@ -15,22 +17,21 @@ const INITCHIPS = 1000
 // class Player
 type Player struct {
 	sync.Mutex
-	conn          *ws.Conn
-	Idx           int
-	Uid, Name     string
-	cards         *card.Cards
-	Chips, Stakes int //chips是玩家拥有的筹码，stakes是下的赌注
-	Status        string
-	Action        string
+	conn           *ws.Conn
+	Idx            int
+	Uid, Name, Avt string
+	cards          *card.Cards
+	Chips, Stakes  int //chips是玩家拥有的筹码，stakes是下的赌注
+	Status         string
+	Action         string
 }
 
 func NewPlayer(idx int, uid string, conn *ws.Conn) *Player {
 	p := &Player{Idx: idx, Uid: uid}
-	name, err := getname(uid)
-	if err != nil {
+
+	if !p.getinfo() {
 		return nil
 	}
-	p.Name = name
 	p.Connect(conn, 0)
 	p.Init()
 	return p
@@ -141,6 +142,7 @@ func (p *Player) Raise(b, n int) {
 func (p *Player) Seatmsg() map[string]interface{} {
 	data := map[string]interface{}{}
 	data["idx"] = p.Idx
+	data["uid"] = p.Uid
 	data["name"] = p.Name
 	data["chips"] = p.Chips
 	data["status"] = p.Status
@@ -148,7 +150,6 @@ func (p *Player) Seatmsg() map[string]interface{} {
 }
 
 func (p *Player) Cardmsg() map[string]interface{} {
-	//data := map[string]interface{}{}
 	cards := p.cards
 	return cards.Msg()
 }
@@ -180,7 +181,54 @@ func (p *Player) Sendactive(opt string, data map[string]interface{}) {
 	}
 }
 
+func (p *Player) Save(kind string, record map[string]interface{}) {
+	pth := "data.record." + kind
+	val, err := user.Search(p.Uid, pth)
+	if err != nil {
+		fmt.Println("Player Save(): search ", err)
+		return
+	}
+	arr, ok := val.([]interface{})
+	if !ok {
+		fmt.Println("Player Save(): reord is not an array!!")
+		return
+	}
+	arr = append(arr, record)
+	if len(arr) > 20 {
+		arr = arr[1:]
+	}
+	err = user.Upsert(p.Uid, pth, arr)
+	if err != nil {
+		fmt.Println("Player Save(): upsert ", err)
+		return
+	}
+}
+
 // implementation
+func (p *Player) getinfo() bool {
+	uid := p.Uid
+	val, err := user.Search(uid, "info")
+	if err != nil {
+		fmt.Println("getinfo err: ", err)
+		return false
+	}
+	info, ok := val.(map[string]interface{})
+	if !ok {
+		return false
+	}
+	ok, name := xx.Getstring(info, "nickname")
+	if !ok {
+		return false
+	}
+	ok, avt := xx.Getstring(info, "headimgurl")
+	if !ok {
+		return false
+	}
+	p.Name, p.Avt = name, avt
+	return true
+}
+
+// test
 func getname(uid string) (string, error) {
 	cfg, err := xxio.Read("user")
 	if err != nil {
@@ -195,7 +243,6 @@ func getname(uid string) (string, error) {
 	return name, nil
 }
 
-// test
 func (p *Player) Print() {
 	s := "player "
 	if p == nil {

@@ -10,12 +10,12 @@ import (
 
 type Conn struct {
 	sync.Mutex
-	conn      *websocket.Conn
-	ch        chan string
-	connected bool
-	messages  []map[string]interface{}
-	msgptr    int
-	idx       int
+	conn        *websocket.Conn
+	ch          chan string
+	connected   bool
+	messages    []map[string]interface{}
+	msgptr, idx int
+	onclose     func()
 }
 
 func Listen(port, pth string, handle func(*websocket.Conn)) {
@@ -57,6 +57,10 @@ func (c *Conn) Close() {
 	if c.connected {
 		c.ch <- "disconnect"
 	}
+}
+
+func (c *Conn) Onclose(f func()) {
+	c.onclose = f
 }
 
 func (c *Conn) Empty(send bool) {
@@ -133,6 +137,7 @@ func (c *Conn) sending() {
 	defer func() {
 		c.conn.Close()
 		c.connected = false
+		// c.onclose()
 		fmt.Println("connection closed...")
 	}()
 	for s := range c.ch {

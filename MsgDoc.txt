@@ -1,0 +1,8 @@
+Send Messages:
+	
+
+Receive Messages:
+	Get ready: ( ->Battle.readying)
+		{
+			"uid": "100001",
+		}

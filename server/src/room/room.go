@@ -25,11 +25,22 @@ func New() *Room {
 // interface
 func (r *Room) Connect(uid string, conn *ws.Conn, ptr int) {
 	for _, p := range r.players {
-		if p.Is(uid) && p.Status == "active" {
+		if p.Is(uid) {
 			p.Connect(conn, ptr)
 			return
 		}
 	}
+}
+
+func (r *Room) Connected() bool {
+	for _, p := range r.players {
+		if p != nil {
+			if p.Connected() {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (r *Room) Enter(uid string, conn *ws.Conn) {
@@ -135,6 +146,27 @@ func (r *Room) Init() {
 	}
 }
 
+func (r *Room) Record() map[string]interface{} {
+	tbl := map[string]interface{}{}
+	for i, p := range r.players {
+		if p != nil {
+			s := strconv.Itoa(i)
+			tbl[s] = map[string]interface{}{
+				"name": p.Name,
+			}
+		}
+	}
+	return tbl
+}
+
+func (r *Room) Save(kind string, record map[string]interface{}) {
+	for _, p := range r.players {
+		if p != nil {
+			p.Save(kind, record)
+		}
+	}
+}
+
 func (r *Room) Enterable() bool {
 	return r.occupancy() < SEATNUM
 }
@@ -163,7 +195,6 @@ func (r *Room) Next(idx int) int {
 	return -1
 }
 
-// implementation
 func (r *Room) Send(opt string, data map[string]interface{}) {
 	for _, p := range r.players {
 		p.Send(opt, data)
@@ -187,16 +218,6 @@ func (r *Room) Msg() map[string]interface{} {
 	}
 	return data
 }
-
-// //待修改 ...
-// func (r *Room) sendraise(idx, raise int) {
-// 	msg := map[string]interface{}{
-// 		"opt": "raise",
-// 	}
-// 	msg["idx"] = idx
-// 	msg["raise"] = raise
-// 	r.Send(msg)
-// }
 
 // implementation
 func (r *Room) occupancy() int {

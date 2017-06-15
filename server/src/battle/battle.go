@@ -2,6 +2,7 @@ package battle
 
 import (
 	"../card"
+	"../lib/user"
 	"../lib/ws"
 	"../lib/xx"
 	"../lib/xxio"
@@ -35,6 +36,7 @@ func New(match *Match, number int) *Battle {
 	}
 	b.room = room.New()
 	b.readying = make(chan map[string]interface{})
+	//这里要改，下注是顺序行为，应该不需要单独开一个信道 ...
 	b.staking = make(chan map[string]interface{})
 	b.pot = 0
 	b.board = nil
@@ -74,7 +76,7 @@ func (b *Battle) Received(msg map[string]interface{}, conn *ws.Conn) bool {
 		return false
 	}
 	if !b.check(msg) {
-		b.end()
+		b.End()
 		return false
 	}
 	opt := msg["opt"].(string)
@@ -85,7 +87,7 @@ func (b *Battle) Received(msg map[string]interface{}, conn *ws.Conn) bool {
 	case "leave":
 		nobody := b.room.Leave(uid)
 		if nobody {
-			b.end()
+			b.End()
 		}
 	case "ready":
 		fmt.Println("received ready msg: ", msg)
@@ -108,23 +110,17 @@ func (b *Battle) Getconfig() map[string]interface{} {
 	return b.config
 }
 
-func (b *Battle) Setconfig(data map[string]interface{}) bool {
+func (b *Battle) Setconfig(data map[string]interface{}, host string) bool {
 	if !checkcfg(data) {
 		return false
 	}
-	data["roomnum"] = b.number
 	b.config = data
+	b.config["host"] = host
+	b.config["roundnum"] = b.number
 	b.mode = data["mode"].(string)
 	// b.turning = data["turning"].(string)
 	b.roundnum = data["roundnum"].(int)
 	return true
-}
-
-func (b *Battle) Ended() bool {
-	if b == nil {
-		return false
-	}
-	return b.ended
 }
 
 func (b *Battle) Msg(currents []*room.Player) map[string]interface{} {
@@ -138,25 +134,44 @@ func (b *Battle) Msg(currents []*room.Player) map[string]interface{} {
 
 func (b *Battle) Run() {
 	fmt.Println("-- b.Run() --")
-	var ok bool
-	b.roundcnt = 1
-	for b.roundcnt <= b.roundnum {
-		ok = b.ready()
+	defer b.End()
+	var start []string
+	running := false
+	for b.roundcnt = 1; b.roundcnt <= b.roundnum; b.roundcnt++ {
+		ok := b.ready()
 		if !ok {
 			break
+		}
+		if !running {
+			running = true
+			if !b.pay() {
+				return
+			}
+			start = b.time()
 		}
 		ok = b.round()
 		if !ok {
 			break
 		}
-		b.roundcnt++
 	}
-	b.end()
+	b.record(start)
+}
+
+func (b *Battle) End() {
+	b.ended = true
+	b.match.Remove(b.number)
+}
+
+func (b *Battle) Ended() bool {
+	if b == nil {
+		return false
+	}
+	return b.ended
 }
 
 // implementation
 func (b *Battle) ready() bool {
-	wait := 15000
+	wait := 14000
 	d := time.Duration(wait)
 	timer := time.NewTimer(d * time.Millisecond)
 	defer timer.Stop()
@@ -176,6 +191,31 @@ func (b *Battle) ready() bool {
 		}
 	}
 	return false
+}
+
+func (b *Battle) pay() bool {
+	inf := "battle pay(): "
+	ok, host := xx.Getstring(b.config, "host")
+	if !ok {
+		fmt.Println(inf + "invalid host!!")
+		return false
+	}
+	var num float64
+	switch b.roundnum {
+	case 2, 5, 10:
+		num = -1
+	case 20:
+		num = -2
+	default:
+		fmt.Println(inf + "invalid roundnum!!")
+		return false
+	}
+	ok = user.Addroomcard(host, num)
+	if !ok {
+		fmt.Println(inf + "addroomcard failed!!")
+		return false
+	}
+	return true
 }
 
 func (b *Battle) round() bool {
@@ -256,19 +296,6 @@ func (b *Battle) round() bool {
 		b.room.Sendactive("result", map[string]interface{}{"winner": data, "winnings": b.pot})
 	}
 	return true
-}
-
-// func (b *Battle) compare(p1, p2 *room.Player) {
-// 	if p1.Compare(p2) {
-// 		b.addscore(p1, p2)
-// 	} else {
-// 		b.addscore(p2, p1)
-// 	}
-// }
-
-func (b *Battle) end() {
-	b.ended = true
-	b.match.Remove(b.number)
 }
 
 func (b *Battle) deal(player *room.Player, num int) *card.Card {
@@ -444,6 +471,23 @@ func winner(currents []*room.Player) []*room.Player {
 		}
 	}
 	return winner
+}
+
+// record of batlle
+func (b *Battle) time() []string {
+	now := time.Now().Unix()
+	t := time.Unix(now, 0)
+	arr := []string{}
+	arr = append(arr, t.Format("2006-01-02"))
+	arr = append(arr, t.Format("15:04"))
+	return arr
+}
+
+func (b *Battle) record(tm []string) {
+	tbl := map[string]interface{}{"time": tm}
+	tbl["roomnum"] = b.Number()
+	tbl["content"] = b.room.Record()
+	b.room.Save("niuniu", tbl)
 }
 
 // check messages from clients
