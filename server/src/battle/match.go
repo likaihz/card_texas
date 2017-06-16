@@ -2,19 +2,20 @@ package battle
 
 import (
 	"math/rand"
+	"strconv"
 	"sync"
 )
 
 type Match struct {
 	sync.Mutex
 	max     int
-	battles map[int]*Battle
+	battles map[string]*Battle
 }
 
 func NewMatch(num int) *Match {
 	m := new(Match)
 	m.max = num
-	m.battles = map[int]*Battle{}
+	m.battles = map[string]*Battle{}
 	return m
 }
 
@@ -25,20 +26,20 @@ func (m *Match) Create() *Battle {
 	if len(m.battles) > m.max {
 		return nil
 	}
-	n := m.number()
-	b := New(m, n)
-	m.battles[n] = b
+	s := m.number()
+	b := New(m, s)
+	m.battles[s] = b
 	return b
 }
 
-// 索引编号为 n 的组
-func (m *Match) Get(n int) *Battle {
-	return m.battles[n]
+// 索引房号为 s 的房间
+func (m *Match) Get(s string) *Battle {
+	return m.battles[s]
 }
 
-// 删除编号为 n 的组
-func (m *Match) Remove(n int) {
-	delete(m.battles, n)
+// 删除房号为 s 的房间
+func (m *Match) Remove(s string) {
+	delete(m.battles, s)
 }
 
 // 随机匹配可进入的组
@@ -53,13 +54,14 @@ func (m *Match) Pop() *Battle {
 	return nil
 }
 
-func (m *Match) number() int {
+func (m *Match) number() string {
 	for {
 		n := rand.Intn(900000) + 100000
-		_, ok := m.battles[n]
+		s := strconv.Itoa(n)
+		_, ok := m.battles[s]
 		if !ok {
-			return n
+			return s
 		}
 	}
-	return -1
+	return ""
 }

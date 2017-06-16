@@ -12,18 +12,19 @@ const SEATNUM = 10
 type Room struct {
 	sync.Mutex
 	players []*Player
-	// playing bool
+	seatnum int
 	current int
 }
 
 func New() *Room {
 	r := &Room{}
+	r.seatnum = num
 	r.players = make([]*Player, SEATNUM)
 	return r
 }
 
 // interface
-func (r *Room) Connect(uid string, conn *ws.Conn, ptr int) {
+func (r *Room) Relink(uid string, conn *ws.Conn, ptr int) {
 	for _, p := range r.players {
 		if p.Is(uid) {
 			p.Connect(conn, ptr)
@@ -47,22 +48,51 @@ func (r *Room) Enter(uid string, conn *ws.Conn) {
 	r.Lock()
 	defer r.Unlock()
 	for i, p := range r.players {
-		if p.Is(uid) {
-			p.Revive(conn)
-			r.players[i] = nil
-			r.Send("revive", p.Seatmsg())
-			r.players[i] = p
-			p.Send("seat", r.Msg())
-			return
-		}
-	}
-	for i, p := range r.players {
 		if p == nil {
 			p = NewPlayer(i, uid, conn)
 			r.Send("enter", p.Seatmsg())
 			r.players[p.Idx] = p
 			p.Send("seat", r.Msg())
-			return
+			break
+		}
+	}
+}
+
+// func (r *Room) Enter(uid string, conn *ws.Conn) {
+// 	r.Lock()
+// 	defer r.Unlock()
+// 	for i, p := range r.players {
+// 		if p.Is(uid) {
+// 			p.Revive(conn)
+// 			r.players[i] = nil
+// 			r.Send("revive", p.Seatmsg())
+// 			r.players[i] = p
+// 			p.Send("seat", r.Msg())
+// 			return
+// 		}
+// 	}
+// 	for i, p := range r.players {
+// 		if p == nil {
+// 			p = NewPlayer(i, uid, conn)
+// 			r.Send("enter", p.Seatmsg())
+// 			r.players[p.Idx] = p
+// 			p.Send("seat", r.Msg())
+// 			return
+// 		}
+// 	}
+// }
+
+func (r *Room) Back(uid string, conn *ws.Conn) {
+	r.Lock()
+	defer r.Unlock()
+	for _, p := range r.players {
+		if p.Is(uid) {
+			msg := map[string]interface{}{
+				"opt": "seat", "data": r.Msg(),
+			}
+			conn.Send(msg)
+			p.Connect(conn, 0)
+			break
 		}
 	}
 }
@@ -72,15 +102,41 @@ func (r *Room) Leave(uid string) bool {
 	defer r.Unlock()
 	for i, p := range r.players {
 		if p.Is(uid) {
-			var opt string
-			if p.Active() {
-				p.Status = "escape"
-				opt = "escape"
-			} else {
-				r.players[i] = nil
-				opt = "leave"
-			}
-			r.Send(opt, p.Seatmsg())
+			r.players[i] = nil
+			r.Send("leave", p.Seatmsg())
+			break
+		}
+	}
+	return r.occupancy() == 0
+}
+
+// func (r *Room) Leave(uid string) bool {
+// 	r.Lock()
+// 	defer r.Unlock()
+// 	for i, p := range r.players {
+// 		if p.Is(uid) {
+// 			var opt string
+// 			if p.Active() {
+// 				p.Status = "escape"
+// 				opt = "escape"
+// 			} else {
+// 				r.players[i] = nil
+// 				opt = "leave"
+// 			}
+// 			r.Send(opt, p.Seatmsg())
+// 			break
+// 		}
+// 	}
+// 	return r.occupancy() == 0
+// }
+
+func (r *Room) Escape(uid string) bool {
+	r.Lock()
+	defer r.Unlock()
+	for _, p := range r.players {
+		if p.Is(uid) {
+			p.Status = "escape"
+			r.Sendactive("escape", p.Seatmsg())
 			break
 		}
 	}
@@ -146,23 +202,31 @@ func (r *Room) Init() {
 	}
 }
 
-func (r *Room) Record() map[string]interface{} {
+func (r *Room) Getrecord() map[string]interface{} {
 	tbl := map[string]interface{}{}
 	for i, p := range r.players {
 		if p != nil {
 			s := strconv.Itoa(i)
 			tbl[s] = map[string]interface{}{
-				"name": p.Name,
+				"name": p.Name, "score": p.Score,
 			}
 		}
 	}
 	return tbl
 }
 
-func (r *Room) Save(kind string, record map[string]interface{}) {
+func (r *Room) Record(kind string, record map[string]interface{}) {
 	for _, p := range r.players {
 		if p != nil {
-			p.Save(kind, record)
+			p.Record(kind, record)
+		}
+	}
+}
+
+func (r *Room) Save(pth string, val interface{}) {
+	for _, p := range r.players {
+		if p != nil {
+			p.Save(pth, val)
 		}
 	}
 }

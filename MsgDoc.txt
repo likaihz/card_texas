@@ -1,8 +1,30 @@
 Send Messages:
-	
+	在下注圈中玩家能够进行的动作(Sendactive)
+		{
+			"opt": "permissions",
+			"data": {
+				"1": "check",
+				"2": "raise",
+				"3": "allin",
+				"4": "fold",
+				"5": "call",
+			},
+		}
 
 Receive Messages:
 	Get ready: ( ->Battle.readying)
 		{
 			"uid": "100001",
+		}
+	下注圈中接收玩家的动作消息：
+		{
+			"uid": "100001",
+			"opt": "bet",
+			"act": "raise",
+			"num": 200
+		}
+		{
+			"uid": "100001",
+			"opt": "bet",
+			"act": "call",
 		}
