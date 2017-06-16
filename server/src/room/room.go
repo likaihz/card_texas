@@ -16,7 +16,7 @@ type Room struct {
 	current int
 }
 
-func New() *Room {
+func New(num int) *Room {
 	r := &Room{}
 	r.seatnum = num
 	r.players = make([]*Player, SEATNUM)
@@ -208,7 +208,7 @@ func (r *Room) Getrecord() map[string]interface{} {
 		if p != nil {
 			s := strconv.Itoa(i)
 			tbl[s] = map[string]interface{}{
-				"name": p.Name, "score": p.Score,
+				"name": p.Name,
 			}
 		}
 	}

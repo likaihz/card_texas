@@ -8,6 +8,7 @@ import (
 	"../lib/xxio"
 	"../room"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -17,7 +18,7 @@ const LIMIT = 100 //注限
 // class Battle
 type Battle struct {
 	match              *Match
-	roomnum            string
+	kind, roomnum      string
 	config             map[string]interface{}
 	readying, betting  chan map[string]interface{}
 	room               *room.Room
@@ -30,11 +31,12 @@ type Battle struct {
 	when               string
 }
 
-func New(match *Match, number int) *Battle {
+func New(match *Match, roomnum string) *Battle {
 	b := &Battle{
-		match: match, number: number,
+		match: match, roomnum: roomnum,
 	}
-	b.room = room.New()
+	b.kind = "holdem"
+	b.room = room.New(10)
 	b.readying = make(chan map[string]interface{})
 	b.betting = make(chan map[string]interface{})
 	b.pot = 0
@@ -71,7 +73,7 @@ func (b *Battle) Connect(msg map[string]interface{}, conn *ws.Conn) bool {
 		msgptr = 0
 	}
 	uid := msg["uid"].(string)
-	b.room.Connect(uid, conn, msgptr)
+	b.room.Relink(uid, conn, msgptr)
 	return true
 }
 
@@ -126,9 +128,10 @@ func (b *Battle) Setconfig(data map[string]interface{}, host string) bool {
 	}
 	b.config = data
 	b.config["host"] = host
-	b.config["roundnum"] = b.number
+	b.config["kind"] = b.kind
+	b.config["roomnum"] = b.roomnum
 	b.mode = data["mode"].(string)
-	// b.turning = data["turning"].(string)
+	//b.turning = data["turning"].(string)
 	b.roundnum = data["roundnum"].(int)
 	return true
 }
@@ -183,7 +186,7 @@ func (b *Battle) Run() {
 
 func (b *Battle) End() {
 	b.ended = true
-	b.match.Remove(b.number)
+	b.match.Remove(b.roomnum)
 }
 
 func (b *Battle) Ended() bool {
@@ -378,7 +381,7 @@ func (b *Battle) betround(round string, currents []*room.Player) int {
 		currents[crt].Sendactive("permissions", data)
 		//接收玩家的身份信息uid操作信息act, 阻塞并等待
 		// var msg map[string]interface{}
-		var act string
+		var act, uid string
 		var num int
 		func() {
 			//接收下注消息的时候要考虑一件事：如果收到该玩家上一轮的下注消息怎么办？...
@@ -390,7 +393,7 @@ func (b *Battle) betround(round string, currents []*room.Player) int {
 			for {
 				select {
 				case msg := <-b.betting:
-					uid := msg["uid"].(string)
+					uid = msg["uid"].(string)
 					act = msg["act"].(string)
 					num = int(msg["num"].(float64))
 					idx := sort.SearchStrings(per, act)
@@ -399,6 +402,7 @@ func (b *Battle) betround(round string, currents []*room.Player) int {
 						return
 					}
 				case <-timer.C:
+					uid = currents[crt].Uid
 					if checkable {
 						act = "check"
 					} else {
@@ -471,9 +475,9 @@ func (b *Battle) Addpot(n int) {
 	b.pot += n
 }
 
-func (b *Battle) addstakes(p *room.Player, n int) {
+// func (b *Battle) addstakes(p *room.Player, n int) {
 
-}
+// }
 
 func (b *Battle) sendactions(uid string, act string, num int) {
 	data := map[string]interface{}{}
@@ -488,7 +492,7 @@ func (b *Battle) sendboard(n int) {
 	tmp := b.board[:n]
 	if len(tmp) != 0 {
 		for i, e := range tmp {
-			s := strconv.Itoa(i)
+			s := strconv.Itoa(i + 1)
 			data[s] = e.Msg()
 		}
 	}
@@ -572,13 +576,13 @@ func (b *Battle) check(msg map[string]interface{}) bool {
 			return false
 		}
 	//这里要改 ...
-	case "raise":
+	case "bet":
 		ok, val := xx.Getnumber(msg, "raise")
 		if !ok {
-			fmt.Printf(err, "raise", val)
+			fmt.Printf(inf, "bet", val)
 			return false
 		}
-		if b.when != "raise" {
+		if b.when != "bet" {
 			return false
 		}
 	case "ready":

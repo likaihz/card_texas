@@ -10,7 +10,30 @@ Send Messages:
 				"5": "call",
 			},
 		}
+	公共牌消息：
+		{
+			"opt": "board",
+			"data": {
+				"1": {
+					"cls": "heart",
+					"idx": 4,
+				},
+				"2": {
+					"cls": "spade",
+					"idx": 11,
+				},
+			}
+		}
+	玩家下注动作：
+		{
+			"opt": "actions",
+			"data": {
+				"uid": "100001",
+				"action": "raise",
+				"num": "200"
+			}
 
+		}
 Receive Messages:
 	Get ready: ( ->Battle.readying)
 		{

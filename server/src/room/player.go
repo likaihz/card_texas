@@ -181,16 +181,16 @@ func (p *Player) Sendactive(opt string, data map[string]interface{}) {
 	}
 }
 
-func (p *Player) Save(kind string, record map[string]interface{}) {
+func (p *Player) Record(kind string, record map[string]interface{}) {
 	pth := "data.record." + kind
 	val, err := user.Search(p.Uid, pth)
 	if err != nil {
-		fmt.Println("Player Save(): search ", err)
+		fmt.Println("Player Record(): search ", err)
 		return
 	}
 	arr, ok := val.([]interface{})
 	if !ok {
-		fmt.Println("Player Save(): reord is not an array!!")
+		fmt.Println("Player Record(): reord is not an array!!")
 		return
 	}
 	arr = append(arr, record)
@@ -199,8 +199,15 @@ func (p *Player) Save(kind string, record map[string]interface{}) {
 	}
 	err = user.Upsert(p.Uid, pth, arr)
 	if err != nil {
-		fmt.Println("Player Save(): upsert ", err)
+		fmt.Println("Player Record(): upsert ", err)
 		return
+	}
+}
+
+func (p *Player) Save(pth string, val interface{}) {
+	err := user.Upsert(p.Uid, pth, val)
+	if err != nil {
+		fmt.Println("Player Upsert(): failed!")
 	}
 }
 

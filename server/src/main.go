@@ -5,6 +5,7 @@ import (
 	"./lib/user"
 	"./lib/ws"
 	"./lib/xx"
+	// "fmt"
 	"net/websocket"
 )
 
@@ -38,7 +39,7 @@ func receive(c *websocket.Conn) {
 		case "access":
 			ok, b = access(msg, conn)
 		case "invite":
-			ok = invite(msg, b.Number())
+			ok = invite(msg, b.Roomnum())
 		default:
 			ok = b.Received(msg, conn)
 		}
@@ -64,42 +65,45 @@ func connect(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
 }
 
 func checkroom(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
-	ok, inroom := xx.Getstring(msg, "inroom")
-	if !ok {
+	inf := "main checkroom(): "
+	uid := msg["uid"].(string)
+	val, err := user.Search(uid, "data.roomnum")
+	if err != nil {
+		println(inf + "user.Search failed!")
 		return false, nil
 	}
-	if inroom == "no" {
+	roomnum, ok := val.(string)
+	if !ok {
+		println(inf + "roomnum type err in db!")
+		return false, nil
+	}
+	b := match.Get(roomnum)
+	if b == nil {
+		res := map[string]interface{}{
+			"opt": "connect", "status": "ok",
+		}
+		conn.Send(res)
 		return true, nil
 	}
-	ok, val := xx.Getnumber(msg, "roomnum")
+	ok = b.Connect(msg, conn)
 	if !ok {
+		println(inf + "battle.Connect failed!")
 		return false, nil
-	}
-	num := int(val)
-	b := match.Get(num)
-	if b == nil {
-		conn.Send(map[string]interface{}{
-			"opt": "out",
-		})
-	} else {
-		ok := b.Connect(msg, conn)
-		if !ok {
-			return false, nil
-		}
 	}
 	return true, b
 }
 
 func create(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
+	var b *battle.Battle
 	uid := msg["uid"].(string)
 	ok := user.Checkroomcard(uid)
 	if !ok {
-		senderror(conn, "lack")
+		b.Sendconfig(conn, "lack")
 		return false, nil
 	}
-	b := match.Create()
+	b = match.Create()
 	if b == nil {
-		senderror(conn, "fail")
+		b.Sendconfig(conn, "fail")
 		return true, nil
 	}
 	ok, data := xx.Getmap(msg, "config")
@@ -108,38 +112,36 @@ func create(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
 	}
 	ok = b.Setconfig(data, uid)
 	if !ok {
-		senderror(conn, "fail")
+		b.Sendconfig(conn, "fail")
 		return false, nil
 	}
-	data = b.Getconfig()
-	sendconfig(conn, data)
+	b.Sendconfig(conn, "enter")
 	go b.Run()
 	return true, b
 }
 
 func access(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
-	ok, val := xx.Getnumber(msg, "roomnum")
+	var b *battle.Battle
+	ok, num := xx.Getstring(msg, "roomnum")
 	if !ok {
-		senderror(conn, "unexist")
+		b.Sendconfig(conn, "unexist")
 		return false, nil
 	}
-	num := int(val)
-	b := match.Get(num)
+	b = match.Get(num)
 	if b == nil {
-		senderror(conn, "unexist")
+		b.Sendconfig(conn, "unexist")
 		return true, nil
 	}
 	if !b.Enterable() {
-		senderror(conn, "full")
+		b.Sendconfig(conn, "full")
 		return true, nil
 	}
-	data := b.Getconfig()
-	sendconfig(conn, data)
+	b.Sendconfig(conn, "enter")
 	return true, b
 }
 
-func invite(msg map[string]interface{}, roomnum int) bool {
-	if roomnum < 0 {
+func invite(msg map[string]interface{}, roomnum string) bool {
+	if roomnum == "" {
 		return true
 	}
 	ok, who := xx.Getstring(msg, "who")
@@ -153,20 +155,4 @@ func invite(msg map[string]interface{}, roomnum int) bool {
 	conn := players[who]
 	conn.Send(msg)
 	return true
-}
-
-// implementation
-func senderror(conn *ws.Conn, err string) {
-	msg := map[string]interface{}{
-		"opt": "front", "status": err,
-	}
-	conn.Send(msg)
-}
-
-func sendconfig(conn *ws.Conn, data map[string]interface{}) {
-	msg := map[string]interface{}{
-		"opt": "front", "status": "ok",
-	}
-	msg["data"] = data
-	conn.Send(msg)
 }
