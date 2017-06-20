@@ -2,19 +2,18 @@ package main
 
 import (
 	"./battle"
-	"./lib/user"
 	"./lib/ws"
 	"./lib/xx"
-	// "fmt"
 	"net/websocket"
 )
 
 var match *battle.Match
-var players map[string]*ws.Conn
+
+// var players map[string]*ws.Conn
 
 func main() {
 	match = battle.NewMatch(2000)
-	players = map[string]*ws.Conn{}
+	// players = map[string]*ws.Conn{}
 	// battle.Test()
 	ws.Listen("8000", "/receive", receive)
 }
@@ -41,23 +40,25 @@ func receive(c *websocket.Conn) {
 		case "invite":
 			ok = invite(msg, b.Roomnum())
 		default:
-			ok = b.Received(msg, conn)
+			ok = b.Receive(msg, conn)
 		}
 	}
 }
 
 func connect(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
+	inf := "main connect(): "
 	ok, cnn := xx.Getstring(msg, "connect")
 	if !ok {
 		return false, nil
 	}
-	uid := msg["uid"].(string)
 	if cnn == "off" {
 		delete(players, uid)
 		return false, nil
 	}
+	uid := msg["uid"].(string)
 	ok, b := checkroom(msg, conn)
 	if !ok {
+		println(inf + "checkroom failed!")
 		return false, nil
 	}
 	players[uid] = conn
@@ -65,85 +66,77 @@ func connect(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
 }
 
 func checkroom(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
-	inf := "main checkroom(): "
-	uid := msg["uid"].(string)
-	val, err := user.Search(uid, "data.roomnum")
-	if err != nil {
-		println(inf + "user.Search failed!")
-		return false, nil
-	}
-	roomnum, ok := val.(string)
+	ok, inroom := xx.Getstring(msg, "inroom")
 	if !ok {
-		println(inf + "roomnum type err in db!")
 		return false, nil
 	}
-	b := match.Get(roomnum)
-	if b == nil {
-		res := map[string]interface{}{
-			"opt": "connect", "status": "ok",
-		}
-		conn.Send(res)
+	if inroom == "no" {
 		return true, nil
 	}
-	ok = b.Connect(msg, conn)
+	ok, num := xx.Getstring(msg, "roomnum")
 	if !ok {
-		println(inf + "battle.Connect failed!")
 		return false, nil
+	}
+	b := match.Get(num)
+	if b == nil {
+		conn.Send(map[string]interface{}{
+			"opt": "out",
+		})
+	} else {
+		ok := b.Connect(msg, conn)
+		if !ok {
+			return false, nil
+		}
 	}
 	return true, b
 }
 
 func create(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
-	var b *battle.Battle
-	uid := msg["uid"].(string)
-	ok := user.Checkroomcard(uid)
-	if !ok {
-		b.Sendconfig(conn, "lack")
-		return false, nil
-	}
-	b = match.Create()
+	b := match.Create()
 	if b == nil {
-		b.Sendconfig(conn, "fail")
+		senderror(conn, "fail")
 		return true, nil
 	}
 	ok, data := xx.Getmap(msg, "config")
 	if !ok {
 		return false, nil
 	}
-	ok = b.Setconfig(data, uid)
+	ok = b.Setconfig(data, "")
 	if !ok {
-		b.Sendconfig(conn, "fail")
+		senderror(conn, "fail")
 		return false, nil
 	}
-	b.Sendconfig(conn, "enter")
+	data = b.Getconfig()
+	sendconfig(conn, data)
 	go b.Run()
 	return true, b
 }
 
 func access(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
-	var b *battle.Battle
 	ok, num := xx.Getstring(msg, "roomnum")
 	if !ok {
-		b.Sendconfig(conn, "unexist")
+		senderror(conn, "unexist")
 		return false, nil
 	}
-	b = match.Get(num)
+	// num := int(val)
+	b := match.Get(num)
 	if b == nil {
-		b.Sendconfig(conn, "unexist")
+		senderror(conn, "unexist")
 		return true, nil
 	}
 	if !b.Enterable() {
-		b.Sendconfig(conn, "full")
+		senderror(conn, "full")
 		return true, nil
 	}
-	b.Sendconfig(conn, "enter")
+	data := b.Getconfig()
+	sendconfig(conn, data)
 	return true, b
 }
 
 func invite(msg map[string]interface{}, roomnum string) bool {
-	if roomnum == "" {
-		return true
-	}
+	// if roomnum < 0 {
+	// 	return true
+	// }
 	ok, who := xx.Getstring(msg, "who")
 	if !ok {
 		return false
@@ -155,4 +148,20 @@ func invite(msg map[string]interface{}, roomnum string) bool {
 	conn := players[who]
 	conn.Send(msg)
 	return true
+}
+
+// implementation
+func senderror(conn *ws.Conn, err string) {
+	msg := map[string]interface{}{
+		"opt": "front", "status": err,
+	}
+	conn.Send(msg)
+}
+
+func sendconfig(conn *ws.Conn, data map[string]interface{}) {
+	msg := map[string]interface{}{
+		"opt": "front", "status": "ok",
+	}
+	msg["data"] = data
+	conn.Send(msg)
 }

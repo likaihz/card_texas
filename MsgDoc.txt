@@ -46,8 +46,21 @@ Receive Messages:
 			"act": "raise",
 			"num": 200
 		}
+
 		{
 			"uid": "100001",
 			"opt": "bet",
 			"act": "call",
+		}
+
+		{
+			"uid": "100001",
+			"opt": "bet",
+			"act": "allin"
+		}
+
+		{
+			"uid": "100001",
+			"opt": "bet",
+			"act": "check"
 		}

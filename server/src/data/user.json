@@ -1,133 +1,38 @@
 {
-	"1": {
-		"name": "夜店佳", "uid": "1",
-		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
-		"chose": "tank_A01",
-		"tank": {
-			"tank_A01": {
-				"skin": ["s0", "s1", "s2"],
-				"chose": "s0"
-			},
-			"tank_A02": {
-				"skin": ["s0", "s1"],
-				"chose": "s0"
-			}
-		}
+	"100001": {
+		"name": "夜店佳", "uid": "100001",
+		"gold": 1000, "roomcard": 1
 	},
-	"2": {
-		"name": "锋削削", "uid": "2",
-		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
-		"chose": "tank_A01",
-		"tank": {
-			"tank_A01": {
-				"skin": ["s0", "s1", "s2"],
-				"chose": "s0"
-			},
-			"tank_A02": {
-				"skin": ["s0"],
-				"chose": "s0"
-			}
-		}
+	"100002": {
+		"name": "锋削削", "uid": "100002",
+		"gold": 1000, "roomcard": 2
 	},
-	"3": {
-		"name": "你阿姨", "uid": "3",
-		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
-		"chose": "tank_A01",
-		"tank": {
-			"tank_A01": {
-				"skin": ["s0", "s1", "s4"],
-				"chose": "s0"
-			}
-		}
+	"100003": {
+		"name": "你阿姨", "uid": "100003",
+		"gold": 1000, "roomcard": 3
 	},
-	"4": {
-		"name": "你蛋哥", "uid": "4",
-		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
-		"chose": "tank_A01",
-		"tank": {
-			"tank_A01": {
-				"skin": ["s0", "s1", "s2"],
-				"chose": "s0"
-			},
-			"tank_A02": {
-				"skin": ["s0", "s3"],
-				"chose": "s0"
-			}
-		}
+	"100004": {
+		"name": "你蛋哥", "uid": "100004",
+		"gold": 1000, "roomcard": 4
 	},
-	"5": {
-		"name": "你表哥", "uid": "5",
-		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
-		"chose": "tank_A01",
-		"tank": {
-			"tank_A01": {
-				"skin": ["s0", "s1", "s2"],
-				"chose": "s0"
-			},
-			"tank_A02": {
-				"skin": ["s2", "s3"],
-				"chose": "s0"
-			}
-		}
+	"100005": {
+		"name": "你表哥", "uid": "100005",
+		"gold": 1000, "roomcard": 5
 	},
-	"6": {
-		"name": "你二舅", "uid": "6",
-		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
-		"chose": "tank_A01",
-		"tank": {
-			"tank_A01": {
-				"skin": ["s0", "s1", "s2"],
-				"chose": "s0"
-			},
-			"tank_A02": {
-				"skin": ["s2", "s3"],
-				"chose": "s0"
-			}
-		}
+	"100006": {
+		"name": "你二舅", "uid": "100006",
+		"gold": 1000, "roomcard": 6
 	},
-	"7": {
-		"name": "你表妹", "uid": "7",
-		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
-		"chose": "tank_A01",
-		"tank": {
-			"tank_A01": {
-				"skin": ["s0", "s1", "s2"],
-				"chose": "s0"
-			},
-			"tank_A02": {
-				"skin": ["s2", "s3"],
-				"chose": "s0"
-			}
-		}
+	"100007": {
+		"name": "你表妹", "uid": "100007",
+		"gold": 1000, "roomcard": 7
 	},
-	"8": {
-		"name": "社会覃", "uid": "8",
-		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
-		"chose": "tank_A01",
-		"tank": {
-			"tank_A01": {
-				"skin": ["s0", "s1", "s2"],
-				"chose": "s0"
-			},
-			"tank_A02": {
-				"skin": ["s2", "s3"],
-				"chose": "s0"
-			}
-		}
+	"100008": {
+		"name": "社会覃", "uid": "100008",
+		"gold": 1000, "roomcard": 8
 	},
-	"9": {
-		"name": "老司机", "uid": "9",
-		"jade": 100, "gold": 1000, "star": 0, "lv": 0,
-		"chose": "tank_A01",
-		"tank": {
-			"tank_A01": {
-				"skin": ["s0", "s1", "s2"],
-				"chose": "s0"
-			},
-			"tank_A02": {
-				"skin": ["s2", "s3"],
-				"chose": "s0"
-			}
-		}
+	"100009": {
+		"name": "老司机", "uid": "100009",
+		"gold": 1000, "roomcard": 9
 	}
 }

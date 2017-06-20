@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-const SEATNUM = 10
+// const SEATNUM = 10
 
 type Room struct {
 	sync.Mutex
@@ -19,18 +19,19 @@ type Room struct {
 func New(num int) *Room {
 	r := &Room{}
 	r.seatnum = num
-	r.players = make([]*Player, SEATNUM)
+	r.players = make([]*Player, num)
 	return r
 }
 
 // interface
-func (r *Room) Relink(uid string, conn *ws.Conn, ptr int) {
+func (r *Room) Relink(uid string, conn *ws.Conn, ptr int) bool {
 	for _, p := range r.players {
 		if p.Is(uid) {
 			p.Connect(conn, ptr)
-			return
+			return true
 		}
 	}
+	return false
 }
 
 func (r *Room) Connected() bool {
@@ -44,7 +45,19 @@ func (r *Room) Connected() bool {
 	return false
 }
 
-func (r *Room) Enter(uid string, conn *ws.Conn) {
+func (r *Room) Check(uid string) bool {
+	for _, p := range r.players {
+		if p.Is(uid) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Room) Enter(uid string, conn *ws.Conn) bool {
+	if r.Back(uid, conn) {
+		return true
+	}
 	r.Lock()
 	defer r.Unlock()
 	for i, p := range r.players {
@@ -53,36 +66,13 @@ func (r *Room) Enter(uid string, conn *ws.Conn) {
 			r.Send("enter", p.Seatmsg())
 			r.players[p.Idx] = p
 			p.Send("seat", r.Msg())
-			break
+			return true
 		}
 	}
+	return false
 }
 
-// func (r *Room) Enter(uid string, conn *ws.Conn) {
-// 	r.Lock()
-// 	defer r.Unlock()
-// 	for i, p := range r.players {
-// 		if p.Is(uid) {
-// 			p.Revive(conn)
-// 			r.players[i] = nil
-// 			r.Send("revive", p.Seatmsg())
-// 			r.players[i] = p
-// 			p.Send("seat", r.Msg())
-// 			return
-// 		}
-// 	}
-// 	for i, p := range r.players {
-// 		if p == nil {
-// 			p = NewPlayer(i, uid, conn)
-// 			r.Send("enter", p.Seatmsg())
-// 			r.players[p.Idx] = p
-// 			p.Send("seat", r.Msg())
-// 			return
-// 		}
-// 	}
-// }
-
-func (r *Room) Back(uid string, conn *ws.Conn) {
+func (r *Room) Back(uid string, conn *ws.Conn) bool {
 	r.Lock()
 	defer r.Unlock()
 	for _, p := range r.players {
@@ -91,10 +81,12 @@ func (r *Room) Back(uid string, conn *ws.Conn) {
 				"opt": "seat", "data": r.Msg(),
 			}
 			conn.Send(msg)
+			conn.Empty(false)
 			p.Connect(conn, 0)
-			break
+			return true
 		}
 	}
+	return false
 }
 
 func (r *Room) Leave(uid string) bool {
@@ -109,26 +101,6 @@ func (r *Room) Leave(uid string) bool {
 	}
 	return r.occupancy() == 0
 }
-
-// func (r *Room) Leave(uid string) bool {
-// 	r.Lock()
-// 	defer r.Unlock()
-// 	for i, p := range r.players {
-// 		if p.Is(uid) {
-// 			var opt string
-// 			if p.Active() {
-// 				p.Status = "escape"
-// 				opt = "escape"
-// 			} else {
-// 				r.players[i] = nil
-// 				opt = "leave"
-// 			}
-// 			r.Send(opt, p.Seatmsg())
-// 			break
-// 		}
-// 	}
-// 	return r.occupancy() == 0
-// }
 
 func (r *Room) Escape(uid string) bool {
 	r.Lock()
@@ -232,7 +204,7 @@ func (r *Room) Save(pth string, val interface{}) {
 }
 
 func (r *Room) Enterable() bool {
-	return r.occupancy() < SEATNUM
+	return r.occupancy() < r.seatnum
 }
 
 func (r *Room) currents() []*Player {
@@ -246,9 +218,9 @@ func (r *Room) currents() []*Player {
 }
 
 func (r *Room) Next(idx int) int {
-	for i := 0; i < SEATNUM; i++ {
+	for i := 0; i < r.seatnum; i++ {
 		idx++
-		if idx >= SEATNUM {
+		if idx >= r.seatnum {
 			idx = 0
 		}
 		p := r.players[idx]

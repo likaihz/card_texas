@@ -3,14 +3,17 @@ package main
 
 import (
 	"./lib/xx"
+	// "bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
+	// "io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/websocket"
 	"os"
+	"strings"
 )
 
 var origin = "http://127.0.0.1:8000/"
@@ -20,8 +23,10 @@ func main() {
 	flag.Parse()
 	if flag.NArg() > 0 {
 		if flag.Arg(0) == "login" {
+			buf := "\"test\": \"\"}"
+			//jsonstr := []byte(buf)
 			client := &http.Client{}
-			reqest, err := http.NewRequest("POST", "http://127.0.0.1:8001/test", nil)
+			reqest, err := http.NewRequest("POST", "http://127.0.0.1:8001/test", strings.NewReader(buf))
 			_, err = client.Do(reqest)
 			if err != nil {
 				fmt.Println("Fatal error ", err.Error())
@@ -61,6 +66,7 @@ func Read() (map[string]interface{}, error) {
 	}
 	var data map[string]interface{}
 	err = json.Unmarshal(file, &data)
+	fmt.Println(data)
 	if err != nil {
 		return nil, err
 	}

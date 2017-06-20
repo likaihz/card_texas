@@ -26,18 +26,14 @@ func test(w http.ResponseWriter, r *http.Request) {
 	res := map[string]interface{}{
 		"status": "fail",
 	}
-	defer xxio.Response(w, &res)
+	defer xxio.Response(w, &res, true)
 
-	req, err := xxio.Request(r)
+	_, err := xxio.Request(r, true)
 	if err != nil {
 		return
 	}
-	cfg, err := getconfig()
-	if err != nil {
-		return
-	}
-	res["cfg"] = cfg
 	data, err := popuser()
+	fmt.Println(data)
 	if err != nil {
 		return
 	}
@@ -48,47 +44,7 @@ func test(w http.ResponseWriter, r *http.Request) {
 	}
 	res["user"] = data
 	// room control
-	mode := req["test"].(string)
-	gcount++
-	generate(res, mode, gcount)
-	if gcount == GNUM {
-		gcount = 0
-	}
 	res["status"] = "ok"
-}
-
-func getconfig() (map[string]interface{}, error) {
-	configs := map[string]interface{}{
-		"tank": 0,
-	}
-	data := map[string]interface{}{}
-	for name := range configs {
-		file, err := xxio.Read(name)
-		if err != nil {
-			return nil, err
-		}
-		data[name] = file
-	}
-	return data, nil
-}
-
-func generate(res map[string]interface{}, mode string, gcount int) {
-	switch mode {
-	case "room", "team":
-		if gcount == 1 {
-			res["opt"] = "create"
-		} else {
-			res["opt"] = "join"
-		}
-		res["cls"] = mode
-	case "match":
-		if gcount == 1 {
-			res["cls"] = "room"
-		} else {
-			res["cls"] = "team"
-		}
-		res["opt"] = "create"
-	}
 }
 
 // 跳过数据库操作

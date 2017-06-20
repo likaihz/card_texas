@@ -80,15 +80,22 @@ func ResetKey(uid string) error {
 	return nil
 }
 
-func Checkroomcard(uid string) bool {
+// roundnum: "one", "two"
+func Checkroomcard(uid, roundnum string) bool {
+	var cost float64
+	switch roundnum {
+	case "one":
+		cost = 1
+	case "two":
+		cost = 2
+	}
 	val, err := Search(uid, "data.roomcard")
 	if err != nil {
-		xxerr("Addroomcard", "search", err)
+		xxerr("Checkroomcard", "search", err)
 		return false
 	}
 	num, ok := val.(float64)
-	if !ok || num < 1 {
-		xxerr("Addroomcard", "type err", nil)
+	if !ok || num < cost {
 		return false
 	}
 	return true
@@ -254,7 +261,7 @@ func getcount() (float64, error) {
 		doc = map[string]interface{}{
 			"uid": "xx", "count": 0.0,
 		}
-		err = xxdb.Insert("YBH", "user", doc)
+		err = xxdb.Insert(DB, "user", doc)
 		if err != nil {
 			xxerr("getcount", "Insert", err)
 			return 0, err

@@ -2,9 +2,9 @@ package room
 
 import (
 	"../card"
-	"../lib/user"
+	// "../lib/user"
 	"../lib/ws"
-	"../lib/xx"
+	// "../lib/xx"
 	"../lib/xxio"
 	"fmt"
 	"strconv"
@@ -182,56 +182,56 @@ func (p *Player) Sendactive(opt string, data map[string]interface{}) {
 }
 
 func (p *Player) Record(kind string, record map[string]interface{}) {
-	pth := "data.record." + kind
-	val, err := user.Search(p.Uid, pth)
-	if err != nil {
-		fmt.Println("Player Record(): search ", err)
-		return
-	}
-	arr, ok := val.([]interface{})
-	if !ok {
-		fmt.Println("Player Record(): reord is not an array!!")
-		return
-	}
-	arr = append(arr, record)
-	if len(arr) > 20 {
-		arr = arr[1:]
-	}
-	err = user.Upsert(p.Uid, pth, arr)
-	if err != nil {
-		fmt.Println("Player Record(): upsert ", err)
-		return
-	}
+	// pth := "data.record." + kind
+	// val, err := user.Search(p.Uid, pth)
+	// if err != nil {
+	// 	fmt.Println("Player Record(): search ", err)
+	// 	return
+	// }
+	// arr, ok := val.([]interface{})
+	// if !ok {
+	// 	fmt.Println("Player Record(): reord is not an array!!")
+	// 	return
+	// }
+	// arr = append(arr, record)
+	// if len(arr) > 20 {
+	// 	arr = arr[1:]
+	// }
+	// err = user.Upsert(p.Uid, pth, arr)
+	// if err != nil {
+	// 	fmt.Println("Player Record(): upsert ", err)
+	// 	return
+	// }
 }
 
 func (p *Player) Save(pth string, val interface{}) {
-	err := user.Upsert(p.Uid, pth, val)
-	if err != nil {
-		fmt.Println("Player Upsert(): failed!")
-	}
+	// err := user.Upsert(p.Uid, pth, val)
+	// if err != nil {
+	// 	fmt.Println("Player Upsert(): failed!")
+	// }
 }
 
 // implementation
 func (p *Player) getinfo() bool {
-	uid := p.Uid
-	val, err := user.Search(uid, "info")
-	if err != nil {
-		fmt.Println("getinfo err: ", err)
-		return false
-	}
-	info, ok := val.(map[string]interface{})
-	if !ok {
-		return false
-	}
-	ok, name := xx.Getstring(info, "nickname")
-	if !ok {
-		return false
-	}
-	ok, avt := xx.Getstring(info, "headimgurl")
-	if !ok {
-		return false
-	}
-	p.Name, p.Avt = name, avt
+	// uid := p.Uid
+	// val, err := user.Search(uid, "info")
+	// if err != nil {
+	// 	fmt.Println("getinfo err: ", err)
+	// 	return false
+	// }
+	// info, ok := val.(map[string]interface{})
+	// if !ok {
+	// 	return false
+	// }
+	// ok, name := xx.Getstring(info, "nickname")
+	// if !ok {
+	// 	return false
+	// }
+	// ok, avt := xx.Getstring(info, "headimgurl")
+	// if !ok {
+	// 	return false
+	// }
+	// p.Name, p.Avt = name, avt
 	return true
 }
 

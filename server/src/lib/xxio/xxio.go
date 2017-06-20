@@ -39,6 +39,7 @@ func Decode(r io.Reader) (map[string]interface{}, error) {
 
 func Request(r *http.Request, crypt bool) (map[string]interface{}, error) {
 	body, err := ioutil.ReadAll(r.Body)
+	fmt.Println(string(body))
 	defer r.Body.Close()
 	if err != nil {
 		return nil, xxerr("Request", "read", err)

@@ -2,7 +2,7 @@ package battle
 
 import (
 	"../card"
-	"../lib/user"
+	// "../lib/user"
 	"../lib/ws"
 	"../lib/xx"
 	"../lib/xxio"
@@ -13,7 +13,10 @@ import (
 	"time"
 )
 
-const LIMIT = 100 //注限
+const (
+	LIMIT  = 100
+	expire = 1800
+)
 
 // class Battle
 type Battle struct {
@@ -21,7 +24,9 @@ type Battle struct {
 	kind, roomnum      string
 	config             map[string]interface{}
 	readying, betting  chan map[string]interface{}
+	timer              *time.Timer
 	room               *room.Room
+	currents           []*room.Player
 	cards              []*card.Card
 	pot                int          //奖池大小
 	board              []*card.Card //公共牌
@@ -41,7 +46,24 @@ func New(match *Match, roomnum string) *Battle {
 	b.betting = make(chan map[string]interface{})
 	b.pot = 0
 	b.board = nil
+
+	dura := time.Duration(expire)
+	b.timer = time.NewTimer(dura * time.Second)
+	go func() {
+		<-b.timer.C
+		b.timer.Stop()
+		b.match.Remove(b.roomnum)
+		print("battle expired...\n")
+	}()
 	return b
+}
+
+// interface
+func (b *Battle) Kind() string {
+	if b == nil {
+		return ""
+	}
+	return b.kind
 }
 
 func (b *Battle) Roomnum() string {
@@ -52,10 +74,15 @@ func (b *Battle) Roomnum() string {
 }
 
 func (b *Battle) Connect(msg map[string]interface{}, conn *ws.Conn) bool {
-	fmt.Println("-- Battle.Connect() --")
+	// fmt.Println("-- Battle.Connect() --")
+	uid := msg["uid"].(string)
+	ok := b.room.Check(uid)
+	if !ok {
+		return true
+	}
 	ok, val := xx.Getnumber(msg, "round")
 	if !ok {
-		return false
+		return true
 	}
 	round := int(val)
 	if round == 0 { // back to room
@@ -65,29 +92,25 @@ func (b *Battle) Connect(msg map[string]interface{}, conn *ws.Conn) bool {
 	// in room n relink
 	ok, val = xx.Getnumber(msg, "msgptr")
 	if !ok {
-		return false
+		return true
 	}
 	msgptr := int(val)
-	//fmt.Println("round, msgptr = ", round, msgptr)
 	if round != b.roundcnt {
 		msgptr = 0
 	}
-	uid := msg["uid"].(string)
-	b.room.Relink(uid, conn, msgptr)
-	return true
+	return b.room.Relink(uid, conn, msgptr)
 }
 
 func (b *Battle) Connected() bool {
 	return b.room.Connected()
 }
 
-func (b *Battle) Received(msg map[string]interface{}, conn *ws.Conn) bool {
+func (b *Battle) Receive(msg map[string]interface{}, conn *ws.Conn) bool {
 	if b.Ended() {
 		return false
 	}
 	if !b.check(msg) {
-		//b.End()
-		return false
+		return true
 	}
 	opt := msg["opt"].(string)
 	uid := msg["uid"].(string)
@@ -102,7 +125,6 @@ func (b *Battle) Received(msg map[string]interface{}, conn *ws.Conn) bool {
 	case "back":
 		b.room.Back(uid, conn)
 	case "ready":
-		// fmt.Println("received ready msg: ", msg)
 		b.readying <- msg
 	case "bet":
 		b.betting <- msg
@@ -160,7 +182,6 @@ func (b *Battle) Msg(currents []*room.Player) map[string]interface{} {
 }
 
 func (b *Battle) Run() {
-	// fmt.Println("-- b.Run() --")
 	defer b.End()
 	var tm []string
 	running := false
@@ -171,9 +192,9 @@ func (b *Battle) Run() {
 		}
 		if !running {
 			running = true
-			if !b.pay() {
-				return
-			}
+			// if !b.pay() {
+			// 	return
+			// }
 			tm = b.start()
 		}
 		ok = b.round()
@@ -187,6 +208,7 @@ func (b *Battle) Run() {
 func (b *Battle) End() {
 	b.ended = true
 	b.match.Remove(b.roomnum)
+	b.timer.Stop()
 }
 
 func (b *Battle) Ended() bool {
@@ -198,7 +220,7 @@ func (b *Battle) Ended() bool {
 
 // implementation
 func (b *Battle) ready() bool {
-	wait := 14000
+	wait := 17000
 	d := time.Duration(wait)
 	timer := time.NewTimer(d * time.Millisecond)
 	b.when = "ready"
@@ -224,35 +246,35 @@ func (b *Battle) ready() bool {
 	return false
 }
 
-func (b *Battle) pay() bool {
-	inf := "battle pay(): "
-	ok, host := xx.Getstring(b.config, "host")
-	if !ok {
-		fmt.Println(inf + "invalid host!!")
-		return false
-	}
-	var num float64
-	switch b.roundnum {
-	case 2, 5, 10:
-		num = -1
-	case 20:
-		num = -2
-	default:
-		fmt.Println(inf + "invalid roundnum!!")
-		return false
-	}
-	ok = user.Addroomcard(host, num)
-	if !ok {
-		fmt.Println(inf + "addroomcard failed!!")
-		return false
-	}
-	return true
-}
+// func (b *Battle) pay() bool {
+// 	inf := "battle pay(): "
+// 	ok, host := xx.Getstring(b.config, "host")
+// 	if !ok {
+// 		fmt.Println(inf + "invalid host!!")
+// 		return false
+// 	}
+// 	var num float64
+// 	switch b.roundnum {
+// 	case 2, 5, 10:
+// 		num = -1
+// 	case 20:
+// 		num = -2
+// 	default:
+// 		fmt.Println(inf + "invalid roundnum!!")
+// 		return false
+// 	}
+// 	ok = user.Addroomcard(host, num)
+// 	if !ok {
+// 		fmt.Println(inf + "addroomcard failed!!")
+// 		return false
+// 	}
+// 	return true
+// }
 
 func (b *Battle) round() bool {
 	b.cards = card.Init()
-	currents := b.room.Newround()
-	d := currents[0]
+	b.currents = b.room.Newround()
+	d := b.currents[0]
 	b.pot = 0
 	b.board = []*card.Card{} //clear the board
 
@@ -262,8 +284,8 @@ func (b *Battle) round() bool {
 	b.room.Sendactive("start", data)
 
 	//blinds
-	sb := currents[1]
-	bb := currents[2]
+	sb := b.currents[1]
+	bb := b.currents[2]
 	sb.Addstakes(LIMIT / 2)
 	bb.Addstakes(LIMIT)
 
@@ -274,29 +296,29 @@ func (b *Battle) round() bool {
 	b.room.Sendactive("blinds", data)
 
 	//deal cards
-	for _, p := range currents {
+	for _, p := range b.currents {
 		p.Init()
 		b.deal(p, 2)
 		p.Sendactive("cards", p.Cardmsg())
 	}
 
 	//pre-flop
-	ended := b.betround("preflop", currents)
+	ended := b.betround("preflop")
 	if ended == 0 {
 		//flop round
 		for i := 0; i < 5; i++ {
 			b.cards, b.board[i] = card.Pop(b.cards)
 		}
 		b.sendboard(3)
-		ended = b.betround("flop", currents)
+		ended = b.betround("flop")
 		if ended == 0 {
 			//turn
 			b.sendboard(4)
-			ended = b.betround("turn", currents)
+			ended = b.betround("turn")
 			if ended == 0 {
 				//river
 				b.sendboard(5)
-				ended = b.betround("river", currents)
+				ended = b.betround("river")
 			}
 		}
 	}
@@ -305,7 +327,7 @@ func (b *Battle) round() bool {
 	case 1:
 		//翻出所有公共牌并比大小 ...
 		b.sendboard(5)
-		winner := winner(currents)
+		winner := winner(b.currents)
 		winnings := b.pot / len(winner)
 		data := map[string]interface{}{}
 		for i, p := range winner {
@@ -317,7 +339,7 @@ func (b *Battle) round() bool {
 	case 2:
 		//奖池中的全部筹码归唯一没有弃牌的玩家 ...
 		var winner *room.Player
-		for _, p := range currents {
+		for _, p := range b.currents {
 			if p.Active() && !p.Folded() {
 				winner = p
 				break
@@ -338,7 +360,7 @@ func (b *Battle) deal(player *room.Player, num int) *card.Card {
 	return c
 }
 
-func (b *Battle) betround(round string, currents []*room.Player) int {
+func (b *Battle) betround(round string) int {
 	//用返回值表示下注回合是否结束
 	//head参数并不是真正的最先行动的人，要首先确定其没有弃牌
 
@@ -347,17 +369,17 @@ func (b *Battle) betround(round string, currents []*room.Player) int {
 	var head, crt, min int
 	if round == "preflop" {
 		head = 2
-		crt = next(head, currents)
+		crt = next(head, b.currents)
 		min = LIMIT
 	} else {
-		crt = next(0, currents)
+		crt = next(0, b.currents)
 		head = -1
 		min = 0
 	}
-	for ; ; crt = next(crt, currents) {
+	for ; ; crt = next(crt, b.currents) {
 		//首先确定当前玩家能够进行的动作
-		s := currents[crt].Stakes
-		c := currents[crt].Chips
+		s := b.currents[crt].Stakes
+		c := b.currents[crt].Chips
 		var checkable bool
 		var per []string
 		var data map[string]interface{}
@@ -378,7 +400,7 @@ func (b *Battle) betround(round string, currents []*room.Player) int {
 			checkable = false
 		}
 		data = permsg(per)
-		currents[crt].Sendactive("permissions", data)
+		b.currents[crt].Sendactive("permissions", data)
 		//接收玩家的身份信息uid操作信息act, 阻塞并等待
 		// var msg map[string]interface{}
 		var act, uid string
@@ -397,12 +419,12 @@ func (b *Battle) betround(round string, currents []*room.Player) int {
 					act = msg["act"].(string)
 					num = int(msg["num"].(float64))
 					idx := sort.SearchStrings(per, act)
-					if uid == currents[crt].Uid && (idx < len(per) && per[idx] == act) {
+					if uid == b.currents[crt].Uid && (idx < len(per) && per[idx] == act) {
 						// 还没考虑num是否合法 ...
 						return
 					}
 				case <-timer.C:
-					uid = currents[crt].Uid
+					uid = b.currents[crt].Uid
 					if checkable {
 						act = "check"
 					} else {
@@ -415,20 +437,20 @@ func (b *Battle) betround(round string, currents []*room.Player) int {
 		switch act {
 		case "call":
 			//跟注
-			currents[crt].Call(min)
+			b.currents[crt].Call(min)
 			num = min
 		case "raise":
 			//加注，更新head
-			currents[crt].Raise(num, min)
+			b.currents[crt].Raise(num, min)
 			min += num
 			head = crt
 		case "fold":
 			//弃牌
-			currents[crt].Fold()
+			b.currents[crt].Fold()
 			b.Addpot(s)
 		case "allin":
 			//全下
-			currents[crt].All_in()
+			b.currents[crt].All_in()
 			num = c
 		case "check":
 			//看牌,好像没什么做的？
@@ -438,7 +460,7 @@ func (b *Battle) betround(round string, currents []*room.Player) int {
 	}
 	//将所有人的下注加到奖池中，并广播该轮下注结束后奖池数量以及每个玩家剩下的筹码
 	chips := map[string]interface{}{}
-	for _, p := range currents {
+	for _, p := range b.currents {
 		if p.Active() && !p.Folded() {
 			b.Addpot(p.Stakes)
 			p.Stakes = 0
@@ -451,7 +473,7 @@ func (b *Battle) betround(round string, currents []*room.Player) int {
 	//结束的情况有两种：所有人都all in或者只剩下一个人没有弃牌
 	all_allin := true
 	not_fold := 0
-	for _, p := range currents {
+	for _, p := range b.currents {
 		if p.Active() {
 			if !p.Allin() {
 				all_allin = false
@@ -537,7 +559,12 @@ func winner(currents []*room.Player) []*room.Player {
 // record of batlle
 func (b *Battle) start() []string {
 	b.room.Save("data.roomnum", b.roomnum)
-	return b.time()
+	t := []string{}
+	now := time.Now().Unix()
+	local := time.Unix(now, 0)
+	t = append(t, local.Format("2006-01-02"))
+	t = append(t, local.Format("15:04"))
+	return t
 }
 
 func (b *Battle) time() []string {
@@ -555,12 +582,14 @@ func (b *Battle) over(tm []string) {
 	tbl["content"] = b.room.Getrecord()
 	b.room.Record(b.kind, tbl)
 	b.room.Save("data.roomnum", "")
+	b.room.Save("data.roomnum", "")
+	//b.room.Send("over", b.statistic())
+	b.room.Init()
 }
 
 // check messages from clients
 func (b *Battle) check(msg map[string]interface{}) bool {
-	// err := "msg invalid %v: %v!!"
-	inf := "battle check: invalid msg %v: %v!!\n"
+	inf := "battle.check(): invalid msg %v: %v!!\n"
 	opt := msg["opt"].(string)
 	switch opt {
 	case "enter", "leave":
@@ -577,11 +606,6 @@ func (b *Battle) check(msg map[string]interface{}) bool {
 		}
 	//这里要改 ...
 	case "bet":
-		ok, val := xx.Getnumber(msg, "raise")
-		if !ok {
-			fmt.Printf(inf, "bet", val)
-			return false
-		}
 		if b.when != "bet" {
 			return false
 		}
