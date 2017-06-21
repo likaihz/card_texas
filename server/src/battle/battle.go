@@ -8,7 +8,7 @@ import (
 	"../lib/xxio"
 	"../room"
 	"fmt"
-	"sort"
+	// "sort"
 	"strconv"
 	"time"
 )
@@ -330,7 +330,7 @@ func (b *Battle) round() bool {
 		//翻出所有公共牌并比大小 ...
 		b.sendboard(5)
 		winners := winner(b.currents)
-		winnings := b.pot / len(winner)
+		winnings := b.pot / len(winners)
 		data := map[string]interface{}{}
 		data["winners"] = map[string]interface{}{}
 		for _, p := range winners {
@@ -473,7 +473,7 @@ func (b *Battle) betround(round string) int {
 			//看牌,好像没什么做的？
 		}
 		//将当前玩家的动作广播给所有玩家
-		b.sendactions(b.currents[crt].Uid, act, num)
+		b.sendactions(b.currents[crt].Idx, act, num)
 	}
 	//将所有人的下注加到奖池中，并广播该轮下注结束后奖池数量以及每个玩家剩下的筹码
 	chips := map[string]interface{}{}
@@ -535,8 +535,8 @@ func (b *Battle) sendboard(n int) {
 	}
 	for _, p := range b.currents {
 		c := b.board[:n]
-		c.Append(p.Cards().Card(0))
-		c.Append(p.Cards().Card(1))
+		c = append(c, p.Cards().Card(0))
+		c = append(c, p.Cards().Card(1))
 		max := card.CombinationTraversal(c)
 		data["rank"] = max.Rank()
 		p.Sendactive("board", data)
@@ -644,7 +644,7 @@ func (b *Battle) check(msg map[string]interface{}) bool {
 
 func (b *Battle) brdmsg() map[string]interface{} {
 	m := map[string]interface{}{}
-	for i, c := range b.currents {
+	for i, c := range b.board {
 		j := strconv.Itoa(i + 1)
 		m[j] = c.Msg()
 	}

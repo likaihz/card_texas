@@ -37,8 +37,8 @@ func receive(c *websocket.Conn) {
 			ok, b = create(msg, conn)
 		case "access":
 			ok, b = access(msg, conn)
-		case "invite":
-			ok = invite(msg, b.Roomnum())
+		// case "invite":
+		// 	ok = invite(msg, b.Roomnum())
 		default:
 			ok = b.Receive(msg, conn)
 		}
@@ -52,16 +52,16 @@ func connect(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
 		return false, nil
 	}
 	if cnn == "off" {
-		delete(players, uid)
+		// delete(players, uid)
 		return false, nil
 	}
-	uid := msg["uid"].(string)
+	// uid := msg["uid"].(string)
 	ok, b := checkroom(msg, conn)
 	if !ok {
 		println(inf + "checkroom failed!")
 		return false, nil
 	}
-	players[uid] = conn
+	// players[uid] = conn
 	return true, b
 }
 
@@ -133,22 +133,22 @@ func access(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
 	return true, b
 }
 
-func invite(msg map[string]interface{}, roomnum string) bool {
-	// if roomnum < 0 {
-	// 	return true
-	// }
-	ok, who := xx.Getstring(msg, "who")
-	if !ok {
-		return false
-	}
-	uid := msg["uid"].(string)
-	delete(msg, "uid")
-	msg["who"] = uid
-	msg["roomnum"] = roomnum
-	conn := players[who]
-	conn.Send(msg)
-	return true
-}
+// func invite(msg map[string]interface{}, roomnum string) bool {
+// 	// if roomnum < 0 {
+// 	// 	return true
+// 	// }
+// 	ok, who := xx.Getstring(msg, "who")
+// 	if !ok {
+// 		return false
+// 	}
+// 	uid := msg["uid"].(string)
+// 	delete(msg, "uid")
+// 	msg["who"] = uid
+// 	msg["roomnum"] = roomnum
+// 	conn := players[who]
+// 	conn.Send(msg)
+// 	return true
+// }
 
 // implementation
 func senderror(conn *ws.Conn, err string) {

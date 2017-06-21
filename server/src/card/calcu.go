@@ -35,8 +35,9 @@ func (c *Cards) calrank() int {
 	}
 	if pairnum == 1 {
 		return 2
-		return 1
+
 	}
+	return 1
 }
 
 // 一对，两对可以一起处理，该函数返回的是一手牌中对子的数目
