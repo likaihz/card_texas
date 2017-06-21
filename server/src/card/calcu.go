@@ -35,8 +35,8 @@ func (c *Cards) calrank() int {
 	}
 	if pairnum == 1 {
 		return 2
+		return 1
 	}
-	return 1
 }
 
 // 一对，两对可以一起处理，该函数返回的是一手牌中对子的数目
@@ -126,3 +126,36 @@ func (c *Cards) fullhouse() bool {
 // 	_, num := c.Most()
 // 	return num >= 4
 // }
+
+// 从多张牌中找出最大的五张牌组合
+func CombinationTraversal(c []*Card) *Cards {
+	n := len(c)
+	if n < 5 {
+		return nil
+	}
+	max := NewCards()
+	flag := []bool{}
+	for i := 0; i < n; i++ {
+		flag[i] = false
+	}
+	for i := 0; i < 5; i++ {
+		max.Append(c[i])
+		flag[i] = true
+	}
+	for i := 0; i < n-1; i++ {
+		if flag[i] && !flag[i+1] {
+			flag[i], flag[i+1] = false, true
+			tmp := NewCards()
+			for j, v := range flag {
+				if v {
+					tmp.Append(c[j])
+				}
+			}
+			if max.Compare(tmp) < 0 {
+				max = tmp
+			}
+		}
+	}
+	return max
+
+}

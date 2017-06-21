@@ -1,5 +1,35 @@
 Send Messages:
-	在下注圈中玩家能够进行的动作(Sendactive)
+	每一轮开始消息：
+		{
+			"opt": "start",
+			"data": {
+				"button": 2,
+				"blind": 10,
+				"round": 3,
+				"seats": {
+					"1": {
+						"uid": "100001",
+						"name": "XXX",
+						"score": 500,
+						"chips": 10
+					},
+					"2": ...
+					...
+				}
+			}
+		}
+	玩家手牌消息：
+	{
+		"opt": "handcards",
+		"data": {
+			"1": {
+				"cls": "heart",
+				"idx": 9,
+			},
+			"2": ...
+		}
+	}
+	在下注圈中玩家能够进行的动作(Sendactive)：
 		{
 			"opt": "permissions",
 			"data": {
@@ -22,45 +52,71 @@ Send Messages:
 					"cls": "spade",
 					"idx": 11,
 				},
+				...
+				"rank": 5,
 			}
 		}
 	玩家下注动作：
 		{
-			"opt": "actions",
+			"opt": "bet",
 			"data": {
-				"uid": "100001",
+				"idx": 2
 				"action": "raise",
-				"num": "200"
+				"num": 200
 			}
+
+		}
+	一轮下注圈结束，但是该局还未结束：
+		{
+			"opt": "over",
+			"data": {
+				"pot": 500,
+				"chips": {
+					"1": 900,
+					"3": 1050,
+				},
+			}
+		}
+	本局比赛已经结束，结算消息
+		{
+			"opt": "final",
+			"data": {
+				"board": {
+					"1": {
+						"cls": "heart",
+						"idx": 5,
+					},
+					...
+					"5": ...
+				},
+				"handcards": {
+					"1": {
+						"cls1": "diamond",
+						"idx1": 10,
+						"cls2": "spade",
+						"idx2": 13,
+					},
+					...
+				},
+				"winners": {
+					"1": 50,
+					"2": 50,
+				},
+			},
 
 		}
 Receive Messages:
 	Get ready: ( ->Battle.readying)
 		{
 			"uid": "100001",
+			"opt": "ready",
 		}
 	下注圈中接收玩家的动作消息：
 		{
 			"uid": "100001",
 			"opt": "bet",
-			"act": "raise",
-			"num": 200
-		}
-
-		{
-			"uid": "100001",
-			"opt": "bet",
-			"act": "call",
-		}
-
-		{
-			"uid": "100001",
-			"opt": "bet",
-			"act": "allin"
-		}
-
-		{
-			"uid": "100001",
-			"opt": "bet",
-			"act": "check"
+			"data": {
+				"act": "raise",
+				"num": 200,
+			},
 		}

@@ -26,7 +26,7 @@ func (c *Cards) Msg() map[string]interface{} {
 	}
 	msg := map[string]interface{}{}
 	for i, e := range c.arr {
-		s := strconv.Itoa(i)
+		s := strconv.Itoa(i + 1)
 		msg[s] = e.Msg()
 	}
 	return msg
@@ -101,39 +101,6 @@ func (c *Cards) Compare(cards *Cards) int {
 	}
 	//同花，高牌
 	return c.Rudecompare(cards)
-}
-
-// 从多张牌中找出最大的五张牌组合
-func (c *Cards) CombinationTraversal() *Cards {
-	n := len(c.arr)
-	if n < 5 {
-		return nil
-	}
-	max := NewCards()
-	flag := []bool{}
-	for i := 0; i < n; i++ {
-		flag[i] = false
-	}
-	for i := 0; i < 5; i++ {
-		max.Append(c.arr[i])
-		flag[i] = true
-	}
-	for i := 0; i < n-1; i++ {
-		if flag[i] && !flag[i+1] {
-			flag[i], flag[i+1] = false, true
-			tmp := NewCards()
-			for j, v := range flag {
-				if v {
-					tmp.Append(c.arr[j])
-				}
-			}
-			if max.Compare(tmp) < 0 {
-				max = tmp
-			}
-		}
-	}
-	return max
-
 }
 
 // func (c *Cards) Price(mode string) int {
