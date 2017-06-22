@@ -9,11 +9,11 @@ import (
 
 var match *battle.Match
 
-// var players map[string]*ws.Conn
+var players map[string]*ws.Conn
 
 func main() {
 	match = battle.NewMatch(2000)
-	// players = map[string]*ws.Conn{}
+	players = map[string]*ws.Conn{}
 	// battle.Test()
 	ws.Listen("8000", "/receive", receive)
 }
@@ -40,6 +40,7 @@ func receive(c *websocket.Conn) {
 		// case "invite":
 		// 	ok = invite(msg, b.Roomnum())
 		default:
+			fmt.Println("main, receive, default")
 			ok = b.Receive(msg, conn)
 		}
 	}
@@ -55,13 +56,13 @@ func connect(msg map[string]interface{}, conn *ws.Conn) (bool, *battle.Battle) {
 		// delete(players, uid)
 		return false, nil
 	}
-	// uid := msg["uid"].(string)
+	uid := msg["uid"].(string)
 	ok, b := checkroom(msg, conn)
 	if !ok {
 		println(inf + "checkroom failed!")
 		return false, nil
 	}
-	// players[uid] = conn
+	players[uid] = conn
 	return true, b
 }
 

@@ -1,0 +1,59 @@
+{
+	"mode": {
+		"normal": 0, "crazy": 0
+	},
+	"turning": {
+		"fixed": 0, "rotated": 0, "scramble": 0
+	},
+	"roundnum": {
+		"one": 2, "two": 20, "three": 30
+	},
+	"order": {
+		"none": 0, "niu1": 1, "niu2": 2, "niu3": 3, "niu4": 4,
+		"niu5": 5, "niu6": 6, "niu7": 7, "niu8": 8, "niu9": 9,
+		"niu10": 10, "straight": 11, "flush": 12, "fullhouse": 13,
+		"small": 14, "flower": 15, "bomb": 16, "straightflush": 17
+	},
+	"score": {
+		"normal": {
+			"straightflush": 5,
+			"bomb": 5,
+			"flower": 5,
+			"small": 5,
+			"fullhouse": 5,
+			"flush": 5,
+			"straight": 5,
+			"niu10": 3,
+			"niu9": 2,
+			"niu8": 2,
+			"niu7": 2,
+			"niu6": 1,
+			"niu5": 1,
+			"niu4": 1,
+			"niu3": 1,
+			"niu2": 1,
+			"niu1": 1,
+			"none": 1
+		},
+		"crazy": {
+			"straightflush": 40,
+			"bomb": 30,
+			"flower": 25,
+			"small": 23,
+			"fullhouse": 20,
+			"flush": 17,
+			"straight": 15,
+			"niu10": 10,
+			"niu9": 9,
+			"niu8": 8,
+			"niu7": 7,
+			"niu6": 6,
+			"niu5": 5,
+			"niu4": 4,
+			"niu3": 3,
+			"niu2": 2,
+			"niu1": 1,
+			"none": 1
+		}
+	}
+}

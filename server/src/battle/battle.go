@@ -8,7 +8,6 @@ import (
 	"../lib/xxio"
 	"../room"
 	"fmt"
-	// "sort"
 	"strconv"
 	"time"
 )
@@ -41,7 +40,7 @@ func New(match *Match, roomnum string) *Battle {
 		match: match, roomnum: roomnum,
 	}
 	b.kind = "holdem"
-	b.room = room.New(10)
+	b.room = room.New(6)
 	b.readying = make(chan map[string]interface{})
 	b.betting = make(chan map[string]interface{})
 	b.pot = 0
@@ -116,6 +115,7 @@ func (b *Battle) Receive(msg map[string]interface{}, conn *ws.Conn) bool {
 	uid := msg["uid"].(string)
 	switch opt {
 	case "enter":
+		fmt.Println("Battle, enter")
 		b.room.Enter(uid, conn)
 	case "leave":
 		nobody := b.room.Leave(uid)
@@ -192,6 +192,7 @@ func (b *Battle) Run() {
 		}
 		if !running {
 			running = true
+			// 房卡结算，开发阶段暂时跳过
 			// if !b.pay() {
 			// 	return
 			// }
@@ -231,8 +232,11 @@ func (b *Battle) ready() bool {
 	for {
 		select {
 		case msg := <-b.readying:
+
+			fmt.Println(msg)
 			uid := msg["uid"].(string)
 			if ok := b.room.Ready(uid); ok {
+				fmt.Println("Battle.ready() ok")
 				b.began = true
 				return true
 			}

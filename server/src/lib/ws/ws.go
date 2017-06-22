@@ -89,8 +89,10 @@ func (c *Conn) Receive() (map[string]interface{}, string) {
 }
 
 func (c *Conn) Send(msg map[string]interface{}) {
+
 	if msg != nil {
 		c.inqueue(msg)
+		fmt.Println(msg)
 	}
 	if !c.connected {
 		return

@@ -119,8 +119,11 @@ func (r *Room) Ready(uid string) bool {
 	r.Lock()
 	defer r.Unlock()
 	var ok bool
+
 	for _, p := range r.players {
+		// fmt.Println(p.Uid)
 		if p.Is(uid) {
+			fmt.Println("Is(Uid)")
 			p.Print()
 			if p.Status == "active" {
 				return false
