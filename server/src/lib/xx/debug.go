@@ -1,17 +1,30 @@
 package xx
 
 import (
-	"fmt"
 	"log"
 	"os"
 )
 
-func Log2file(path string) (*log.Logger, *os.File) {
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0)
+var file *os.File
+
+// create debug log
+func Openlog(name string) {
+	var err error
+	file, err = os.Create(name + ".log")
 	if err != nil {
-		fmt.Printf("%s\r\n", err.Error())
+		print("%s\r\n", err.Error())
 		os.Exit(-1)
 	}
-	l := log.New(file, "\r\n", log.Ldate|log.Ltime|log.Llongfile)
-	return l, file
+	log.SetOutput(file)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+	log.Println("不知道这次能坚持几秒...")
+}
+
+// close debug log
+func Closelog() {
+	log.Println("擦，我又挂了！")
+	err := file.Close()
+	if err != nil {
+		log.Println("Closelog() ", err)
+	}
 }

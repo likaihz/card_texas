@@ -11,7 +11,7 @@ Send Messages:
 						"uid": "100001",
 						"name": "XXX",
 						"score": 500,
-						"chips": 10
+						"chip": 10
 					},
 					"2": ...
 					...
@@ -62,7 +62,9 @@ Send Messages:
 			"data": {
 				"idx": 2
 				"action": "raise",
-				"num": 200
+				"num": 200,
+				"pot": 1000,
+				""
 			}
 
 		}
@@ -91,16 +93,24 @@ Send Messages:
 				},
 				"handcards": {
 					"1": {
-						"cls1": "diamond",
-						"idx1": 10,
-						"cls2": "spade",
-						"idx2": 13,
+						"1":{
+							"cls": "diamond",
+							"idx": 10,
+						},
+						"2": {
+							"cls": "spade",
+							"idx": 13,
+						},
 					},
 					...
 				},
 				"winners": {
-					"1": 50,
-					"2": 50,
+					"1": {
+						"winning": 50,
+						"totalchips": 50
+						"rank": 5,
+						},
+					"2": ...
 				},
 			},
 

@@ -4,41 +4,43 @@ import (
 	"../card"
 	// "../lib/user"
 	"../lib/ws"
-	// "../lib/xx"
-	"../lib/xxio"
-	"fmt"
+	"../lib/xx"
+	// "fmt"
+	"log"
 	"strconv"
 	"sync"
 )
 
 //玩家在进入房间时自动买入筹码的数目
-const INITCHIPS = 1000
+const INITSCORE = 1000
 
 // class Player
 type Player struct {
 	sync.Mutex
-	conn           *ws.Conn
-	Idx            int
-	Uid, Name, Avt string
-	cards          *card.Cards
-	Chips, Stakes  int //chips是玩家拥有的筹码，stakes是下的赌注
-	Status         string
-	Action         string
+	conn                   *ws.Conn
+	cards                  *card.Cards
+	Idx                    int
+	roundscore             int
+	Uid, Name, Avt, Status string
+	Chip, Score            int //chips是玩家拥有的筹码，stakes是下的赌注
+	Action                 string
+	Statistic              map[string]int
 }
 
 func NewPlayer(idx int, uid string, conn *ws.Conn) *Player {
 	p := &Player{Idx: idx, Uid: uid}
-
 	if !p.getinfo() {
 		return nil
 	}
+	p.Statistic = map[string]int{}
+	conn.Empty(false)
 	p.Connect(conn, 0)
 	p.Init()
 	return p
 }
 
 func (p *Player) Debug() {
-	fmt.Println("---- debug ----")
+	log.Println("---- debug ----")
 	p.conn.Receive()
 }
 
@@ -46,18 +48,13 @@ func (p *Player) Init() {
 	p.Status = "waiting"
 	p.conn.Empty(false)
 	p.cards = card.NewCards()
-	p.Stakes = 0
+	//p.Stakes = 0
 	//进入房间时系统自动为玩家买入筹码 ...
-	p.Chips = INITCHIPS
+	p.Score = INITSCORE
 }
 
 func (p *Player) Connected() bool {
 	return p.conn.Connected()
-}
-
-func (p *Player) Revive(conn *ws.Conn) {
-	p.conn = conn
-	p.Status = "revive"
 }
 
 // interface of game
@@ -99,18 +96,24 @@ func (p *Player) Fold() {
 }
 
 //下注
-func (p *Player) Addstakes(s int) int {
-	p.Stakes += s
-	return p.Stakes
+func (p *Player) Addchip(s int) int {
+	p.Score += s
+	return p.Score
 }
 
 //全下，返回值为全下的金额
 func (p *Player) All_in() int {
-	c := p.Chips
-	p.Chips -= c
-	p.Stakes += c
+	s := p.Score
+	p.Score -= s
+	p.Chip += s
 	p.Status = "allin"
-	return c
+	return s
+}
+
+func (p *Player) Count() {
+	if p.roundscore > 0 {
+		p.Statistic["winnum"]++
+	}
 }
 
 func (p *Player) Cards() *card.Cards {
@@ -127,15 +130,19 @@ func (p *Player) Compare(player *Player) int {
 }
 
 // 买入筹码
-func (p *Player) Addchips(n int) {
-	p.Chips += n
+func (p *Player) Buyscore(n int) {
+	p.Score += n
+}
+
+func (p *Player) Addscore(n int) {
+	p.Score += n
 }
 
 func (p *Player) Call(n int) {
-	p.Stakes += n
+	p.Chip += n
 }
 func (p *Player) Raise(b, n int) {
-	p.Stakes += (b + n)
+	p.Chip += (b + n)
 }
 
 // interface of net
@@ -144,7 +151,8 @@ func (p *Player) Seatmsg() map[string]interface{} {
 	data["idx"] = p.Idx
 	data["uid"] = p.Uid
 	data["name"] = p.Name
-	data["chips"] = p.Chips
+	data["chip"] = p.Chip
+	data["score"] = p.Score
 	data["status"] = p.Status
 	return data
 }
@@ -213,7 +221,7 @@ func (p *Player) Save(pth string, val interface{}) {
 
 // implementation
 func (p *Player) getinfo() bool {
-	// uid := p.Uid
+	uid := p.Uid
 	// val, err := user.Search(uid, "info")
 	// if err != nil {
 	// 	fmt.Println("getinfo err: ", err)
@@ -232,22 +240,31 @@ func (p *Player) getinfo() bool {
 	// 	return false
 	// }
 	// p.Name, p.Avt = name, avt
+	name, ok := getname(uid)
+	if ok {
+		p.Name = name
+	}
 	return true
 }
 
 // test
-func getname(uid string) (string, error) {
-	cfg, err := xxio.Read("user")
+func getname(uid string) (string, bool) {
+	cfg, err := xx.Read("user")
 	if err != nil {
-		return "", err
+		log.Println("getname() ", err)
+		return "", false
 	}
-	val, ok := cfg[uid]
+	ok, data := xx.Getmap(cfg, uid)
 	if !ok {
-		return "", fmt.Errorf("invalid uid!")
+		log.Println("getname() invalid data!")
+		return "", false
 	}
-	data := val.(map[string]interface{})
-	name := data["name"].(string)
-	return name, nil
+	ok, name := xx.Getstring(data, "name")
+	if !ok {
+		log.Println("getname() invalid name!")
+		return "", false
+	}
+	return name, true
 }
 
 func (p *Player) Print() {
@@ -260,5 +277,5 @@ func (p *Player) Print() {
 		s += p.Name
 		s += " " + p.Status
 	}
-	fmt.Println(s)
+	log.Println(s)
 }

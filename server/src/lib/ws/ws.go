@@ -2,7 +2,7 @@ package ws
 
 import (
 	"../xx"
-	"fmt"
+	"log"
 	"net/http"
 	"net/websocket"
 	"sync"
@@ -15,14 +15,13 @@ type Conn struct {
 	connected   bool
 	messages    []map[string]interface{}
 	msgptr, idx int
-	onclose     func()
 }
 
 func Listen(port, pth string, handle func(*websocket.Conn)) {
 	http.Handle(pth, websocket.Handler(handle))
 	err := http.ListenAndServe(":"+port, nil)
 	if err != nil {
-		panic("ListenAndServe: " + err.Error())
+		log.Panic("ListenAndServe: " + err.Error())
 	}
 }
 
@@ -59,10 +58,6 @@ func (c *Conn) Close() {
 	}
 }
 
-func (c *Conn) Onclose(f func()) {
-	c.onclose = f
-}
-
 func (c *Conn) Empty(send bool) {
 	if c.connected && send {
 		c.Send(nil)
@@ -75,7 +70,7 @@ func (c *Conn) Receive() (map[string]interface{}, string) {
 	var req string
 	err := websocket.Message.Receive(c.conn, &req)
 	if err != nil {
-		fmt.Println("ws receive error: ", err)
+		log.Println("Receive() ", err)
 		return nil, ""
 	}
 	ok, msg, opt := parse(req)
@@ -89,10 +84,8 @@ func (c *Conn) Receive() (map[string]interface{}, string) {
 }
 
 func (c *Conn) Send(msg map[string]interface{}) {
-
 	if msg != nil {
 		c.inqueue(msg)
-		fmt.Println(msg)
 	}
 	if !c.connected {
 		return
@@ -102,6 +95,7 @@ func (c *Conn) Send(msg map[string]interface{}) {
 	}
 }
 
+// resend msgs in queue from index ptr
 func (c *Conn) Resend(ptr int) {
 	c.rsqueue(ptr)
 	c.Send(nil)
@@ -112,7 +106,7 @@ func (c *Conn) Replace(c1 *Conn) *Conn {
 	defer c.Unlock()
 	if c1 != nil {
 		messages := c1.Msg()
-		c.messages = append(messages, c.messages...)
+		c.messages = append(c.messages, messages...)
 		c1.Close()
 	}
 	return c
@@ -122,14 +116,17 @@ func (c *Conn) Replace(c1 *Conn) *Conn {
 func parse(req string) (bool, map[string]interface{}, string) {
 	msg := xx.Str2map(req)
 	if msg == nil {
+		log.Println("parse() invalid msg!")
 		return false, nil, ""
 	}
 	ok, opt := xx.Getstring(msg, "opt")
 	if !ok {
+		log.Println("parse() invalid opt in msg!")
 		return false, nil, ""
 	}
 	ok, _ = xx.Getstring(msg, "uid")
 	if !ok {
+		log.Println("parse() invalid uid in msg!")
 		return false, nil, ""
 	}
 	return true, msg, opt
@@ -139,8 +136,7 @@ func (c *Conn) sending() {
 	defer func() {
 		c.conn.Close()
 		c.connected = false
-		// c.onclose()
-		fmt.Println("connection closed...")
+		log.Println("connection closed...")
 	}()
 	for s := range c.ch {
 		if s == "disconnect" {
@@ -148,7 +144,7 @@ func (c *Conn) sending() {
 		}
 		err := websocket.Message.Send(c.conn, s)
 		if err != nil {
-			fmt.Println(err)
+			log.Println("sending() ", err)
 			break
 		}
 	}
@@ -168,10 +164,10 @@ func (c *Conn) dequeue() map[string]interface{} {
 		return nil
 	}
 	msg := c.messages[c.msgptr]
-	if c.idx >= 3 {
-		opt := msg["opt"].(string)
-		fmt.Println("msg ", c.msgptr, opt)
-	}
+	// if c.idx >= 3 {
+	// 	opt := msg["opt"].(string)
+	// 	log.Println("msg ", c.msgptr, opt)
+	// }
 	c.msgptr++
 	return msg
 }

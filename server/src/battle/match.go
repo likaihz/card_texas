@@ -1,6 +1,7 @@
 package battle
 
 import (
+	"log"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -24,11 +25,16 @@ func (m *Match) Create() *Battle {
 	m.Lock()
 	defer m.Unlock()
 	if len(m.battles) > m.max {
+		log.Println("Create() the match is full!")
 		return nil
 	}
 	s := m.number()
 	b := New(m, s)
-	m.battles[s] = b
+	if b == nil {
+		log.Println("Create() failed!")
+	} else {
+		m.battles[s] = b
+	}
 	return b
 }
 

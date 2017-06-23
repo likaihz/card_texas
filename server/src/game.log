@@ -1,0 +1,7 @@
+2017/06/23 14:45:33 debug.go:20: 不知道这次能坚持几秒...
+2017/06/23 14:45:36 main.go:27: in receive
+2017/06/23 14:45:36 main.go:40: map[msgptr:0 round:0 uid:100005 opt:connect connect:on]
+2017/06/23 14:45:37 main.go:43: map[opt:create config:map[roundnum:one mode:normal turning:rotated] uid:100005 kind:niuniu]
+2017/06/23 14:45:42 main.go:27: in receive
+2017/06/23 14:45:42 main.go:40: map[msgptr:0 round:0 uid:100003 opt:connect connect:on]
+2017/06/23 14:45:45 main.go:46: map[opt:access roomnum:798081 uid:100003 kind:niuniu]

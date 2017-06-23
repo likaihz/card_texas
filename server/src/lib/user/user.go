@@ -1,50 +1,48 @@
 package user
 
 import (
+	"../mongo"
 	"../xx"
-	"../xxdb"
-	"../xxio"
 	"crypto/md5"
 	"crypto/rand"
 	"encoding/hex"
 	"gopkg.in/mgo.v2/bson"
+	"log"
 	"math"
 	"strconv"
 	"strings"
 	"time"
 )
 
-const (
-	DB = "YBH"
-)
+const DB = "YBH"
 
 // create a new user
-func New(token map[string]interface{}) (map[string]interface{}, error) {
-	data, err := xxio.Read("user")
+func New(token map[string]interface{}) map[string]interface{} {
+	data, err := xx.Read("user")
 	if err != nil {
-		xxerr("New", "read", err)
-		return nil, err
+		log.Println("New() ", err)
+		return nil
 	}
 	ok, _ := xx.Getnumber(data, "roomcard")
 	if !ok {
-		err = xxerr("New", "roomcard", nil)
-		return nil, err
+		log.Println("New() ", "user.json error!")
+		return nil
 	}
 	ok, openid := xx.Getstring(token, "openid")
 	if !ok {
-		err = xxerr("New", "openid", nil)
-		return nil, err
+		log.Println("New() ", "token error!")
+		return nil
 	}
-	key, err := generateKey(openid)
-	if err != nil {
-		xxerr("New", "generateKey", nil)
-		return nil, err
+	key, ok := generateKey(openid)
+	if !ok {
+		log.Println("New() generate key failed!")
+		return nil
 	}
 	data["key"] = key
-	uid, err := generateUid()
-	if err != nil {
-		xxerr("New", "generateUid", nil)
-		return nil, err
+	uid, ok := generateUid()
+	if !ok {
+		log.Println("New() generate uid failed!")
+		return nil
 	}
 	data["uid"] = uid
 	doc := map[string]interface{}{"uid": uid}
@@ -52,32 +50,36 @@ func New(token map[string]interface{}) (map[string]interface{}, error) {
 	now := time.Now().Unix()
 	tm := time.Unix(now, 0)
 	doc["time"] = tm.Format("2006-01-02 15:04:05")
-	err = xxdb.Insert(DB, "user", doc)
+	err = mongo.Insert(DB, "user", doc)
 	if err != nil {
-		xxerr("New", "insert", err)
-		return nil, err
+		log.Println("New() ", err)
+		return nil
 	}
-	return doc, nil
+	return doc
 }
 
-func ResetKey(uid string) error {
+func ResetKey(uid string) bool {
 	val, err := Search(uid, "token.openid")
 	if err != nil {
-		xxerr("ResetKey", "search", nil)
-		return err
+		log.Println("ResetKey() ", err)
+		return false
 	}
-	openid := val.(string)
-	key, err := generateKey(openid)
-	if err != nil {
-		xxerr("ResetKey", "generateKey", nil)
-		return err
+	openid, ok := val.(string)
+	if !ok {
+		log.Println("ResetKey() openid type error!")
+		return false
+	}
+	key, ok := generateKey(openid)
+	if !ok {
+		log.Println("ResetKey() generate key failed!")
+		return false
 	}
 	err = Upsert(uid, "data.key", key)
 	if err != nil {
-		xxerr("ResetKey", "upsert", nil)
-		return err
+		log.Println("ResetKey() ", err)
+		return false
 	}
-	return nil
+	return true
 }
 
 // roundnum: "one", "two"
@@ -88,38 +90,46 @@ func Checkroomcard(uid, roundnum string) bool {
 		cost = 1
 	case "two":
 		cost = 2
+	default:
+		log.Println("Checkroomcard() invalid roundnum!")
+		return false
 	}
 	val, err := Search(uid, "data.roomcard")
 	if err != nil {
-		xxerr("Checkroomcard", "search", err)
+		log.Println("Checkroomcard() ", err)
 		return false
 	}
 	num, ok := val.(float64)
-	if !ok || num < cost {
+	if !ok {
+		log.Println("Checkroomcard() roomcard type error!")
 		return false
 	}
-	return true
+	return num >= cost
 }
 
 func Addroomcard(uid string, n float64) bool {
 	if n > 10000 {
-		xxerr("Addroomcard", "range err", nil)
+		log.Println("Addroomcard() range error!")
 		return false
 	}
 	n = math.Floor(n)
 	val, err := Search(uid, "data.roomcard")
 	if err != nil {
-		xxerr("Addroomcard", "search", err)
+		log.Println("Addroomcard() ", err)
 		return false
 	}
 	num, ok := val.(float64)
-	if !ok || num+n < 0 {
-		xxerr("Addroomcard", "type err", nil)
+	if !ok {
+		log.Println("Addroomcard() roomcard type error!")
+		return false
+	}
+	if num+n < 0 {
+		log.Println("Addroomcard() roomcard can not be negative!")
 		return false
 	}
 	err = Inc(uid, "data.roomcard", float64(n))
 	if err != nil {
-		xxerr("Addroomcard", "inc", err)
+		log.Println("Addroomcard() ", err)
 		return false
 	}
 	return true
@@ -128,18 +138,20 @@ func Addroomcard(uid string, n float64) bool {
 // find doc in user's data
 func Find(uid string) (map[string]interface{}, error) {
 	sel := bson.M{}
-	doc, err := xxdb.Find(DB, "user", bson.M{"uid": uid}, sel)
+	doc, err := mongo.Find(DB, "user", bson.M{"uid": uid}, sel)
 	if err != nil {
-		return nil, xxerr("Find", "", err)
+		log.Println("Find() ", err)
+		return nil, err
 	}
 	return doc, nil
 }
 
 func FindBy(pth, val string) (map[string]interface{}, error) {
 	sel := bson.M{}
-	doc, err := xxdb.Find(DB, "user", bson.M{pth: val}, sel)
+	doc, err := mongo.Find(DB, "user", bson.M{pth: val}, sel)
 	if err != nil {
-		return nil, xxerr("Find", "", err)
+		log.Println("FindBy() ", err)
+		return nil, err
 	}
 	return doc, nil
 }
@@ -148,7 +160,11 @@ func FindBy(pth, val string) (map[string]interface{}, error) {
 func Search(uid, pth string) (interface{}, error) {
 	doc, err := Find(uid)
 	if err != nil {
-		return nil, xxerr("Search", "", err)
+		log.Println("Search() ", err)
+		return nil, err
+	}
+	if doc == nil {
+		return nil, nil
 	}
 	if pth == "" {
 		return doc, nil
@@ -168,38 +184,38 @@ func Search(uid, pth string) (interface{}, error) {
 
 // update user's infomation item
 func Upsert(uid, pth string, val interface{}) error {
-	err := xxdb.Upsert(DB, "user", bson.M{"uid": uid}, bson.M{pth: val})
+	err := mongo.Upsert(DB, "user", bson.M{"uid": uid}, bson.M{pth: val})
 	if err != nil {
-		return xxerr("Upsert", "", err)
+		log.Println("Upsert() ", err)
 	}
-	return nil
+	return err
 }
 
 // increase user's infomation item
 func Inc(uid, pth string, num float64) error {
-	err := xxdb.Inc(DB, "user", bson.M{"uid": uid}, bson.M{pth: num})
+	err := mongo.Inc(DB, "user", bson.M{"uid": uid}, bson.M{pth: num})
 	if err != nil {
-		return xxerr("Inc", "", err)
+		log.Println("Inc() ", err)
 	}
-	return nil
+	return err
 }
 
 // unset key in user data
 func Unset(uid, pth string) error {
-	err := xxdb.Unset(DB, "user", bson.M{"uid": uid}, bson.M{pth: 1})
+	err := mongo.Unset(DB, "user", bson.M{"uid": uid}, bson.M{pth: 1})
 	if err != nil {
-		return xxerr("Unset", "", err)
+		log.Println("Unset() ", err)
 	}
-	return nil
+	return err
 }
 
 // remove user's full data
 func Remove(uid string) error {
-	err := xxdb.Remove(DB, "user", bson.M{"uid": uid})
+	err := mongo.Remove(DB, "user", bson.M{"uid": uid})
 	if err != nil {
-		return xxerr("Remove", "", err)
+		log.Println("Remove() ", err)
 	}
-	return nil
+	return err
 }
 
 // insert element to array
@@ -210,11 +226,11 @@ func ArrayInsert(uid, name, pth string, content interface{}) error {
 	} else {
 		condition = bson.M{"name": name}
 	}
-	err := xxdb.AddToSet(DB, "user", condition, bson.M{pth: content})
+	err := mongo.AddToSet(DB, "user", condition, bson.M{pth: content})
 	if err != nil {
-		return xxerr("ArrayInsert", "", err)
+		log.Println("ArrayInsert() ", err)
 	}
-	return nil
+	return err
 }
 
 // remove element from array
@@ -225,80 +241,70 @@ func ArrayRemove(uid, name, pth string, content interface{}) error {
 	} else {
 		condition = bson.M{"name": name}
 	}
-	err := xxdb.Pull(DB, "user", condition, bson.M{pth: content})
+	err := mongo.Pull(DB, "user", condition, bson.M{pth: content})
 	if err != nil {
-		return xxerr("ArrayRemove", "", err)
-	}
-	return nil
-}
-
-// implementation
-// generate user's ID
-func generateUid() (string, error) {
-	num, err := getcount()
-	if err != nil {
-		xxerr("generateUid", "getcount", err)
-		return "", err
-	}
-	num++
-	err = setcount(num)
-	if err != nil {
-		xxerr("generateUid", "setcount", err)
-		return "", err
-	}
-	num += 100000
-	uid := strconv.Itoa(int(num))
-	return uid, nil
-}
-
-func getcount() (float64, error) {
-	doc, err := Find("xx")
-	if err != nil {
-		xxerr("getcount", "Find", err)
-		return 0, err
-	}
-	if doc == nil {
-		doc = map[string]interface{}{
-			"uid": "xx", "count": 0.0,
-		}
-		err = xxdb.Insert(DB, "user", doc)
-		if err != nil {
-			xxerr("getcount", "Insert", err)
-			return 0, err
-		}
-	}
-	ok, count := xx.Getnumber(doc, "count")
-	if !ok {
-		err = xxerr("getcount", "Getnumber", err)
-		return 0, err
-	}
-	return count, nil
-}
-
-func setcount(num float64) error {
-	err := Upsert("xx", "count", num)
-	if err != nil {
-		xxerr("setcount", "", err)
+		log.Println("ArrayRemove() ", err)
 	}
 	return err
 }
 
-func generateKey(openid string) (string, error) {
+// implementation
+// generate user's ID
+func generateUid() (string, bool) {
+	num, ok := getcount()
+	if !ok {
+		log.Println("generateUid() getcount failed!")
+		return "", false
+	}
+	num++
+	ok = setcount(num)
+	if !ok {
+		log.Println("generateUid() setcount failed!")
+		return "", false
+	}
+	num += 100000
+	uid := strconv.Itoa(int(num))
+	return uid, true
+}
+
+func getcount() (float64, bool) {
+	val, err := Search("xx", "count")
+	if err != nil {
+		log.Println("getcount() ", err)
+		return 0, false
+	}
+	if val == nil {
+		ok := setcount(0)
+		return 0, ok
+	}
+	count, ok := val.(float64)
+	if !ok {
+		log.Println("getcount() count type error!")
+		return 0, false
+	}
+	return count, true
+}
+
+func setcount(num float64) bool {
+	err := Upsert("xx", "count", num)
+	if err != nil {
+		log.Println("setcount() ", "", err)
+		return false
+	}
+	return true
+}
+
+func generateKey(openid string) (string, bool) {
 	data := md5.Sum([]byte(openid))
 	base := data[:]
 	salt := make([]byte, 12)
 	_, err := rand.Read(salt)
 	if err != nil {
-		xxerr("generateKey", "", err)
-		return "", err
+		log.Println("generateKey() ", err)
+		return "", false
 	}
 	s1 := hex.EncodeToString(base)
 	s2 := hex.EncodeToString(salt)
 	key := s1 + s2
-	return key, nil
-}
-
-func xxerr(fn, info string, err error) error {
-	fn = "user " + fn + "(): "
-	return xxio.Error(true, fn, info, err)
+	return key, true
 }

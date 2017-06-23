@@ -2,6 +2,7 @@ package room
 
 import (
 	"../lib/ws"
+	"log"
 	// "fmt"
 	"strconv"
 	"sync"
@@ -12,14 +13,15 @@ import (
 type Room struct {
 	sync.Mutex
 	players []*Player
+	number  string
 	seatnum int
 	current int
 }
 
-func New(num int) *Room {
-	r := &Room{}
-	r.seatnum = num
-	r.players = make([]*Player, num)
+func New(number string, seatnum int) *Room {
+	r := &Room{number: number}
+	r.seatnum = seatnum
+	r.players = make([]*Player, seatnum)
 	return r
 }
 
@@ -63,8 +65,9 @@ func (r *Room) Enter(uid string, conn *ws.Conn) bool {
 	for i, p := range r.players {
 		if p == nil {
 			p = NewPlayer(i, uid, conn)
+			// p.Save("data.roomnum", r.number)
 			r.Send("enter", p.Seatmsg())
-			r.players[p.Idx] = p
+			r.players[i] = p
 			p.Send("seat", r.Msg())
 			return true
 		}
@@ -94,6 +97,7 @@ func (r *Room) Leave(uid string) bool {
 	defer r.Unlock()
 	for i, p := range r.players {
 		if p.Is(uid) {
+			// p.Save("data.roomnum", "")
 			r.players[i] = nil
 			r.Send("leave", p.Seatmsg())
 			break
@@ -121,10 +125,7 @@ func (r *Room) Ready(uid string) bool {
 	var ok bool
 
 	for _, p := range r.players {
-		// fmt.Println(p.Uid)
 		if p.Is(uid) {
-			fmt.Println("Is(Uid)")
-			p.Print()
 			if p.Status == "active" {
 				return false
 			}
@@ -221,6 +222,10 @@ func (r *Room) currents() []*Player {
 }
 
 func (r *Room) Next(idx int) int {
+	if idx < 0 {
+		log.Println("Next() negative idx!")
+		return -1
+	}
 	for i := 0; i < r.seatnum; i++ {
 		idx++
 		if idx >= r.seatnum {
@@ -231,6 +236,7 @@ func (r *Room) Next(idx int) int {
 			return idx
 		}
 	}
+	log.Println("Next() didn't find player!")
 	return -1
 }
 
@@ -249,9 +255,9 @@ func (r *Room) Sendactive(opt string, data map[string]interface{}) {
 func (r *Room) Msg() map[string]interface{} {
 	data := map[string]interface{}{}
 	data["dealer"] = r.current
-	for i, p := range r.players {
+	for _, p := range r.players {
 		if p != nil {
-			j := strconv.Itoa(i)
+			j := strconv.Itoa(p.Idx)
 			data[j] = p.Seatmsg()
 		}
 	}
