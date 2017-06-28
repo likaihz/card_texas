@@ -7,7 +7,7 @@ import (
 	"../lib/xx"
 	"../room"
 	"fmt"
-	// "log"
+	"log"
 	"strconv"
 	"time"
 )
@@ -106,6 +106,10 @@ func (b *Battle) Connected() bool {
 }
 
 func (b *Battle) Receive(msg map[string]interface{}, conn *ws.Conn) bool {
+	if b == nil {
+		log.Println("b is nil")
+		return false
+	}
 	if b.Ended() {
 		return false
 	}
@@ -221,7 +225,7 @@ func (b *Battle) Ended() bool {
 
 // implementation
 func (b *Battle) ready() bool {
-	wait := 17000
+	wait := 20000
 	d := time.Duration(wait)
 	timer := time.NewTimer(d * time.Millisecond)
 	b.when = "ready"
@@ -298,26 +302,31 @@ func (b *Battle) round() bool {
 
 	// start message
 	data := map[string]interface{}{
-		"button": d.Idx, "round": b.roundcnt,
+		"dealer": d.Idx, "round": b.roundcnt,
 		"blind": LIMIT,
 	}
 	seats := map[string]interface{}{}
 	for _, p := range b.currents {
+		p.Newround()
 		j := strconv.Itoa(p.Idx)
 		seats[j] = p.Seatmsg()
 	}
 	data["seats"] = seats
 	b.room.Sendactive("start", data)
 
+	b.room.Sendactive("present", map[string]interface{}{"idx": b.next(b.bbpos)})
 	//deal cards
 	for _, p := range b.currents {
-		p.Init()
 		b.deal(p, 2)
-		p.Sendactive("handcards", p.Cardmsg())
+		data := map[string]interface{}{}
+		data["cards"] = p.Cardmsg()
+		data["next"] = b.next(b.bbpos)
+		p.Sendactive("handcards", data)
 	}
 
 	//pre-flop
-	ended := b.betround("preflop")
+	var ended int
+	ended = b.betround("preflop")
 	if ended == 0 {
 		//flop round
 		for i := 0; i < 5; i++ {
@@ -368,8 +377,13 @@ func (b *Battle) round() bool {
 				break
 			}
 		}
-		data := map[string]interface{}{"1": winner.Idx}
-		b.room.Sendactive("final", map[string]interface{}{"winner": data, "winnings": b.pot})
+		winner.Win(b.pot)
+		data := map[string]interface{}{}
+		d := map[string]interface{}{}
+		d["score"] = winner.Score
+		d["addscore"] = b.pot
+		data[strconv.Itoa(winner.Idx)] = d
+		b.room.Sendactive("final", map[string]interface{}{"winners": data})
 	}
 	return true
 }
@@ -393,59 +407,65 @@ func (b *Battle) betround(round string) int {
 		b.when = ""
 	}()
 	var head, crt, min int
+	limit := LIMIT
 	if round == "preflop" {
-		head = 2
-		crt = next(head, b.currents)
+		head = b.bbpos
+		crt = b.next(head)
 		min = LIMIT
 	} else {
-		crt = next(0, b.currents)
-		head = -1
+		head = b.next(0)
+		crt = head
 		min = 0
 	}
-	for ; ; crt = next(crt, b.currents) {
+	for ; ; crt = b.next(crt) {
 		//首先确定当前玩家能够进行的动作
 		c := b.currents[crt].Chip
 		s := b.currents[crt].Score
-		var checkable bool
-		var per []string
+		// var checkable bool
+		var choose []string
 		var data map[string]interface{}
 		if crt == head {
 			//一圈下注已经结束，回到第一个下(加)注的人，那么该轮下注结束
 			break
 		} else if c >= min {
 			//当前玩家能够选择看牌、加注、弃牌、全下
-			per = []string{"allin", "check", "fold", "raise"}
-			checkable = true
+			choose = []string{"fold", "check", "raise"}
+			// checkable = true
 		} else if min-c >= s {
 			//可以弃牌、全下
-			per = []string{"allin", "fold"}
-			checkable = false
+			choose = []string{"fold", "allin"}
+			// checkable = false
 		} else {
 			//可以跟注、加注、弃牌、全下
-			per = []string{"allin", "call", "fold", "raise"}
-			checkable = false
+			choose = []string{"fold", "call", "raise"}
+			// checkable = false
 		}
-		data = permsg(per)
-		b.currents[crt].Sendactive("permissions", data)
+		data = chomsg(choose)
+		data["min"] = limit
+		data["max"] = b.currents[crt].Score
+		data["pot"] = b.pot
+		b.currents[crt].Sendactive("choose", data)
+		choose = append(choose, "allin")
 		//接收玩家的身份信息uid操作信息act, 阻塞并等待
 		var act, uid string
 		var num int
 		func() {
 			//接收下注消息的时候要考虑一件事：如果收到该玩家上一轮的下注消息怎么办？...
 			//考虑是不是要在消息中添加一个字段用来标记是哪一轮下注
-			wait := 14000
+			wait := 20000
 			d := time.Duration(wait)
 			timer := time.NewTimer(d * time.Millisecond)
 			defer timer.Stop()
 			for {
 				select {
 				case msg := <-b.betting:
+					b.check(msg)
 					uid = msg["uid"].(string)
 					data := msg["data"].(map[string]interface{})
-					act = data["act"].(string)
-					num = int(msg["num"].(float64))
+					act = data["action"].(string)
+					num = int(data["num"].(float64))
 					legal := false
-					for _, s := range per {
+					for _, s := range choose {
 						if s == act {
 							legal = true
 							break
@@ -456,19 +476,20 @@ func (b *Battle) betround(round string) int {
 						return
 					}
 				case <-timer.C:
-					uid = b.currents[crt].Uid
-					if checkable {
-						act = "check"
-					} else {
-						act = "fold"
-					}
-					return
+					// uid = b.currents[crt].Uid
+					// if checkable {
+					// 	act = "check"
+					// } else {
+					// 	act = "fold"
+					// }
+					// return
 				}
 			}
 		}()
 		switch act {
 		case "call":
 			//跟注
+			log.Println("in call, crt is", crt)
 			b.currents[crt].Call(min)
 			num = min
 		case "raise":
@@ -488,7 +509,7 @@ func (b *Battle) betround(round string) int {
 			//看牌,好像没什么做的？
 		}
 		//将当前玩家的动作广播给所有玩家
-		b.sendactions(b.currents[crt].Idx, act, num)
+		b.sendactions(b.currents[crt], act)
 	}
 	//将所有人的下注加到奖池中，并广播该轮下注结束后奖池数量以及每个玩家剩下的筹码
 	score := map[string]interface{}{}
@@ -523,7 +544,7 @@ func (b *Battle) betround(round string) int {
 		return 2
 	}
 	data := map[string]interface{}{"pot": b.pot, "score": score}
-	b.room.Sendactive("over", data)
+	b.room.Sendactive("betend", data)
 	return 0
 }
 
@@ -531,11 +552,13 @@ func (b *Battle) Addpot(n int) {
 	b.pot += n
 }
 
-func (b *Battle) sendactions(idx int, act string, num int) {
+func (b *Battle) sendactions(p *room.Player, act string) {
 	data := map[string]interface{}{}
-	data["idx"] = idx
+	data["idx"] = p.Idx
 	data["action"] = act
-	data["num"] = num
+	data["chips"] = p.Chip
+	data["score"] = p.Score
+	// data["next"] = b.next(p.Idx)
 	b.room.Sendactive("bet", data)
 }
 
@@ -558,19 +581,19 @@ func (b *Battle) sendboard(n int) {
 	}
 }
 
-func next(c int, currents []*room.Player) int {
-	num := len(currents)
+func (b *Battle) next(c int) int {
+	num := len(b.currents)
 	next := -1
 	for i := c + 1; next < 0; i++ {
 		i = i % num
-		if currents[i].Status == "active" && !currents[i].Folded() {
+		if b.currents[i].Status == "active" && !b.currents[i].Folded() {
 			next = i
 		}
 	}
 	return next
 }
 
-func permsg(p []string) map[string]interface{} {
+func chomsg(p []string) map[string]interface{} {
 	data := map[string]interface{}{}
 	for i, s := range p {
 		j := strconv.Itoa(i + 1)
@@ -631,21 +654,23 @@ func (b *Battle) check(msg map[string]interface{}) bool {
 	switch opt {
 	case "enter", "leave":
 		if b.began {
-			fmt.Printf(inf, "opt", opt)
-			fmt.Println("battle has began...")
+			log.Printf(inf, "opt", opt)
+			log.Println("battle has began...")
 			return false
 		}
 	case "back":
 		if !b.began {
-			fmt.Printf(inf, "opt", opt)
-			fmt.Println("battle has not began...")
+			log.Printf(inf, "opt", opt)
+			log.Println("battle has not began...")
 			return false
 		}
 	//这里要改 ...
 	case "bet":
 		if b.when != "bet" {
+			log.Println("it's not time to bet")
 			return false
 		}
+
 	case "ready":
 		if b.when != "ready" {
 			return false

@@ -46,6 +46,7 @@ func receive(c *websocket.Conn) {
 			log.Println(msg)
 			ok, b = access(msg, conn)
 		default:
+			log.Println("receive default", msg)
 			ok = b.Receive(msg, conn)
 		}
 	}

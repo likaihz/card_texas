@@ -3,15 +3,17 @@ Send Messages:
 		{
 			"opt": "start",
 			"data": {
-				"button": 2,
+				"dealer": 2,
 				"blind": 10,
 				"round": 3,
+				"next": 2,
 				"seats": {
 					"1": {
 						"uid": "100001",
 						"name": "XXX",
 						"score": 500,
-						"chip": 10
+						"chip": 10,
+						"idx": 1
 					},
 					"2": ...
 					...
@@ -31,13 +33,12 @@ Send Messages:
 	}
 	在下注圈中玩家能够进行的动作(Sendactive)：
 		{
-			"opt": "permissions",
+			"opt": "choose",
 			"data": {
 				"1": "check",
 				"2": "raise",
 				"3": "allin",
-				"4": "fold",
-				"5": "call",
+				
 			},
 		}
 	公共牌消息：
@@ -60,17 +61,18 @@ Send Messages:
 		{
 			"opt": "bet",
 			"data": {
+
 				"idx": 2
 				"action": "raise",
 				"num": 200,
 				"pot": 1000,
-				""
+				"next": 4,
 			}
 
 		}
 	一轮下注圈结束，但是该局还未结束：
 		{
-			"opt": "over",
+			"opt": "betend",
 			"data": {
 				"pot": 500,
 				"chips": {
@@ -106,11 +108,10 @@ Send Messages:
 				},
 				"winners": {
 					"1": {
-						"winning": 50,
-						"totalchips": 50
+						"score": 50,
+						"addscore": 50
 						"rank": 5,
 						},
-					"2": ...
 				},
 			},
 

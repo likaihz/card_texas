@@ -24,6 +24,7 @@ type Player struct {
 	Uid, Name, Avt, Status string
 	Chip, Score            int //chips是玩家拥有的筹码，stakes是下的赌注
 	Action                 string
+	Cntchips               int
 	Statistic              map[string]int
 }
 
@@ -53,6 +54,9 @@ func (p *Player) Init() {
 	p.Score = INITSCORE
 }
 
+func (p *Player) Newround() {
+
+}
 func (p *Player) Connected() bool {
 	return p.conn.Connected()
 }
@@ -97,8 +101,10 @@ func (p *Player) Fold() {
 
 //下注
 func (p *Player) Addchip(s int) int {
-	p.Score += s
-	return p.Score
+	p.Chip += s
+	p.Cntchips += s
+	p.Score -= s
+	return p.Chip
 }
 
 //全下，返回值为全下的金额
@@ -106,6 +112,7 @@ func (p *Player) All_in() int {
 	s := p.Score
 	p.Score -= s
 	p.Chip += s
+	p.Cntchips += s
 	p.Status = "allin"
 	return s
 }
@@ -140,9 +147,17 @@ func (p *Player) Addscore(n int) {
 
 func (p *Player) Call(n int) {
 	p.Chip += n
+	p.Cntchips += n
+	p.Score -= n
 }
 func (p *Player) Raise(b, n int) {
 	p.Chip += (b + n)
+	p.Cntchips += (b + n)
+	p.Score -= (b + n)
+}
+
+func (p *Player) Win(n int) {
+	p.Score += n
 }
 
 // interface of net
@@ -151,7 +166,7 @@ func (p *Player) Seatmsg() map[string]interface{} {
 	data["idx"] = p.Idx
 	data["uid"] = p.Uid
 	data["name"] = p.Name
-	data["chip"] = p.Chip
+	data["chips"] = p.Chip
 	data["score"] = p.Score
 	data["status"] = p.Status
 	return data
@@ -176,6 +191,7 @@ func (p *Player) Send(opt string, data map[string]interface{}) {
 		msg := map[string]interface{}{
 			"opt": opt, "data": data,
 		}
+		log.Println("player.send()", msg)
 		p.conn.Send(msg)
 	}
 }
@@ -185,6 +201,7 @@ func (p *Player) Sendactive(opt string, data map[string]interface{}) {
 		msg := map[string]interface{}{
 			"opt": opt, "data": data,
 		}
+		log.Println(p.Uid, msg)
 		p.conn.Send(msg)
 	}
 }
