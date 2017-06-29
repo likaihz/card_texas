@@ -36,6 +36,8 @@ func NewPlayer(idx int, uid string, conn *ws.Conn) *Player {
 	p.Statistic = map[string]int{}
 	conn.Empty(false)
 	p.Connect(conn, 0)
+	//进入房间时系统自动为玩家买入筹码 ...
+	p.Score = INITSCORE
 	p.Init()
 	return p
 }
@@ -50,8 +52,7 @@ func (p *Player) Init() {
 	p.conn.Empty(false)
 	p.cards = card.NewCards()
 	//p.Stakes = 0
-	//进入房间时系统自动为玩家买入筹码 ...
-	p.Score = INITSCORE
+	p.Chip = 0
 }
 
 func (p *Player) Newround() {
@@ -201,7 +202,7 @@ func (p *Player) Sendactive(opt string, data map[string]interface{}) {
 		msg := map[string]interface{}{
 			"opt": opt, "data": data,
 		}
-		log.Println(p.Uid, msg)
+		log.Println(p.Uid, p.Idx, msg)
 		p.conn.Send(msg)
 	}
 }

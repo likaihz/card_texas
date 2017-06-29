@@ -5,7 +5,6 @@ import (
 	// "./lib/user"
 	"./lib/ws"
 	"./lib/xx"
-	// "fmt"
 	"log"
 	"net/websocket"
 )
@@ -13,10 +12,9 @@ import (
 var match *battle.Match
 
 func main() {
-	xx.Openlog("game")
+	xx.Openlog("main")
 	defer xx.Closelog()
 	match = battle.NewMatch(2000)
-	// battle.Test()
 	ws.Listen("8000", "/receive", receive)
 }
 
@@ -29,7 +27,6 @@ func receive(c *websocket.Conn) {
 	var b *battle.Battle
 	for ok {
 		msg, opt := conn.Receive()
-		//log.Println(msg)
 		if msg == nil {
 			break
 		}

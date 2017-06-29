@@ -19,21 +19,21 @@ const (
 
 // class Battle
 type Battle struct {
-	match                *Match
-	kind, roomnum        string
-	config               map[string]interface{}
-	readying, betting    chan map[string]interface{}
-	timer                *time.Timer
-	room                 *room.Room
-	currents             []*room.Player
-	button, sbpos, bbpos int
-	cards                []*card.Card
-	pot                  int          //奖池大小
-	board                []*card.Card //公共牌
-	roundcnt, roundnum   int
-	began, ended         bool
-	mode                 string
-	when                 string
+	match              *Match
+	kind, roomnum      string
+	config             map[string]interface{}
+	readying, betting  chan map[string]interface{}
+	timer              *time.Timer
+	room               *room.Room
+	currents           []*room.Player
+	sbpos, bbpos       int //小盲注、大盲注在currents中的下标
+	cards              []*card.Card
+	pot                int          //奖池大小
+	board              []*card.Card //公共牌
+	roundcnt, roundnum int
+	began, ended       bool
+	mode               string
+	when               string
 }
 
 func New(match *Match, roomnum string) *Battle {
@@ -137,9 +137,9 @@ func (b *Battle) Receive(msg map[string]interface{}, conn *ws.Conn) bool {
 }
 
 func (b *Battle) Enterable() bool {
-	if b.began {
-		return false
-	}
+	// if b.began {
+	// 	return false
+	// }
 	return b.room.Enterable()
 }
 
@@ -314,33 +314,39 @@ func (b *Battle) round() bool {
 	data["seats"] = seats
 	b.room.Sendactive("start", data)
 
-	b.room.Sendactive("present", map[string]interface{}{"idx": b.next(b.bbpos)})
 	//deal cards
 	for _, p := range b.currents {
 		b.deal(p, 2)
-		data := map[string]interface{}{}
-		data["cards"] = p.Cardmsg()
-		data["next"] = b.next(b.bbpos)
+		data := p.Cardmsg()
+		// data["next"] = b.next(b.bbpos)
 		p.Sendactive("handcards", data)
+		// p.Sendactive("present", map[string]interface{}{"idx": b.next(b.bbpos)})
 	}
-
+	b.sendrank(0)
+	//发公共牌
+	var c *card.Card
+	for i := 0; i < 5; i++ {
+		b.cards, c = card.Pop(b.cards)
+		b.board = append(b.board, c)
+	}
 	//pre-flop
 	var ended int
 	ended = b.betround("preflop")
+	log.Println("betround return ", ended)
 	if ended == 0 {
 		//flop round
-		for i := 0; i < 5; i++ {
-			b.cards, b.board[i] = card.Pop(b.cards)
-		}
 		b.sendboard(3)
+		b.sendrank(3)
 		ended = b.betround("flop")
 		if ended == 0 {
 			//turn
 			b.sendboard(4)
+			b.sendrank(4)
 			ended = b.betround("turn")
 			if ended == 0 {
 				//river
 				b.sendboard(5)
+				b.sendrank(5)
 				ended = b.betround("river")
 			}
 		}
@@ -349,6 +355,7 @@ func (b *Battle) round() bool {
 	switch ended {
 	case 1:
 		//翻出所有公共牌并比大小 ...
+		// 暂时没有考虑边池，不过已经记录下每个玩家在一轮中下注总金额
 		b.sendboard(5)
 		winners := winner(b.currents)
 		winnings := b.pot / len(winners)
@@ -385,6 +392,8 @@ func (b *Battle) round() bool {
 		data[strconv.Itoa(winner.Idx)] = d
 		b.room.Sendactive("final", map[string]interface{}{"winners": data})
 	}
+	b.room.Send("clean", b.room.Msg())
+	b.room.Init()
 	return true
 }
 
@@ -406,16 +415,16 @@ func (b *Battle) betround(round string) int {
 	defer func() {
 		b.when = ""
 	}()
-	var head, crt, min int
-	limit := LIMIT
+	var head, crt, ante int //每一轮下注时第一个行动的玩家、当前行动的玩家、当前底注
+	limit := LIMIT          //最小加注金额，还没有玩家加注时，该值等于大盲注金额
 	if round == "preflop" {
 		head = b.bbpos
 		crt = b.next(head)
-		min = LIMIT
+		ante = LIMIT
 	} else {
 		head = b.next(0)
 		crt = head
-		min = 0
+		ante = 0
 	}
 	for ; ; crt = b.next(crt) {
 		//首先确定当前玩家能够进行的动作
@@ -424,14 +433,13 @@ func (b *Battle) betround(round string) int {
 		// var checkable bool
 		var choose []string
 		var data map[string]interface{}
-		if crt == head {
-			//一圈下注已经结束，回到第一个下(加)注的人，那么该轮下注结束
-			break
-		} else if c >= min {
+
+		b.room.Sendactive("present", map[string]interface{}{"idx": b.currents[crt].Idx})
+		if c >= ante {
 			//当前玩家能够选择看牌、加注、弃牌、全下
 			choose = []string{"fold", "check", "raise"}
 			// checkable = true
-		} else if min-c >= s {
+		} else if ante-c >= s {
 			//可以弃牌、全下
 			choose = []string{"fold", "allin"}
 			// checkable = false
@@ -441,12 +449,13 @@ func (b *Battle) betround(round string) int {
 			// checkable = false
 		}
 		data = chomsg(choose)
-		data["min"] = limit
+		data["min"] = limit //最小加注金额
 		data["max"] = b.currents[crt].Score
 		data["pot"] = b.pot
+		data["num"] = ante - b.currents[crt].Chip //跟注金额
 		b.currents[crt].Sendactive("choose", data)
 		choose = append(choose, "allin")
-		//接收玩家的身份信息uid操作信息act, 阻塞并等待
+		//接收玩家的身份信息uid操作信息act
 		var act, uid string
 		var num int
 		func() {
@@ -459,7 +468,10 @@ func (b *Battle) betround(round string) int {
 			for {
 				select {
 				case msg := <-b.betting:
-					b.check(msg)
+					ok := b.check(msg)
+					if !ok {
+						continue
+					}
 					uid = msg["uid"].(string)
 					data := msg["data"].(map[string]interface{})
 					act = data["action"].(string)
@@ -475,6 +487,10 @@ func (b *Battle) betround(round string) int {
 						// 还没考虑num是否合法 ...
 						return
 					}
+					if !legal {
+						log.Println(uid, "bet msg is illegal")
+						continue
+					}
 				case <-timer.C:
 					// uid = b.currents[crt].Uid
 					// if checkable {
@@ -486,16 +502,17 @@ func (b *Battle) betround(round string) int {
 				}
 			}
 		}()
+		b.currents[crt].Action = act
 		switch act {
 		case "call":
 			//跟注
 			log.Println("in call, crt is", crt)
-			b.currents[crt].Call(min)
-			num = min
+			b.currents[crt].Call(ante)
+			num = ante
 		case "raise":
 			//加注，更新head
-			b.currents[crt].Raise(num, min)
-			min += num
+			b.currents[crt].Raise(num, ante)
+			ante += num
 			head = crt
 		case "fold":
 			//弃牌
@@ -510,6 +527,11 @@ func (b *Battle) betround(round string) int {
 		}
 		//将当前玩家的动作广播给所有玩家
 		b.sendactions(b.currents[crt], act)
+
+		//判断该轮下注是否结束
+		if b.betover(head, crt) {
+			break
+		}
 	}
 	//将所有人的下注加到奖池中，并广播该轮下注结束后奖池数量以及每个玩家剩下的筹码
 	score := map[string]interface{}{}
@@ -520,7 +542,8 @@ func (b *Battle) betround(round string) int {
 			score[strconv.Itoa(p.Idx)] = p.Score
 		}
 	}
-
+	data := map[string]interface{}{"pot": b.pot, "score": score}
+	b.room.Sendactive("betend", data)
 	//判断之后是否还需要继续下一轮下注
 	//结束的情况有三种：所有人都all in、只剩下一个人没有弃牌、河牌圈已经结束
 	all_allin := true
@@ -543,8 +566,7 @@ func (b *Battle) betround(round string) int {
 	if not_fold == 1 {
 		return 2
 	}
-	data := map[string]interface{}{"pot": b.pot, "score": score}
-	b.room.Sendactive("betend", data)
+
 	return 0
 }
 
@@ -571,16 +593,44 @@ func (b *Battle) sendboard(n int) {
 			data[s] = e.Msg()
 		}
 	}
-	for _, p := range b.currents {
-		c := b.board[:n]
-		c = append(c, p.Cards().Card(0))
-		c = append(c, p.Cards().Card(1))
-		max := card.CombinationTraversal(c)
-		data["rank"] = max.Rank()
-		p.Sendactive("board", data)
-	}
+	// for _, p := range b.currents {
+	// 	c := b.board[:n]
+	// 	c = append(c, p.Cards().Card(0))
+	// 	c = append(c, p.Cards().Card(1))
+	// 	log.Println("c is ok", len(c))
+	// 	// max := card.CombinationTraversal(c)
+	// 	max := card.NewCards()
+	// 	for i := 0; i < 5; i++ {
+	// 		max.Insert(c[i])
+	// 	}
+	// 	log.Println("CombinationTraversal is ok")
+	// 	data["rank"] = card.Rankname(max.Rank())
+	// p.Sendactive("board", data)
+	// p.Sendactive("present", map[string]interface{}{"idx": b.next(0)})
+	// }
+	b.room.Sendactive("board", data)
 }
 
+func (b *Battle) sendrank(n int) {
+	if n == 0 {
+		for _, p := range b.currents {
+			c := p.Cards()
+			if c.Card(0).Idx() == c.Card(1).Idx() {
+				p.Sendactive("rank", map[string]interface{}{"rank": card.Rankname(2)})
+			} else {
+				p.Sendactive("rank", map[string]interface{}{"rank": card.Rankname(1)})
+			}
+		}
+	} else {
+		for _, p := range b.currents {
+			c := b.board[:n]
+			c = append(c, p.Cards().Card(0))
+			c = append(c, p.Cards().Card(1))
+			max := card.CombinationTraversal(c)
+			p.Sendactive("rank", map[string]interface{}{"rank": card.Rankname(max.Rank())})
+		}
+	}
+}
 func (b *Battle) next(c int) int {
 	num := len(b.currents)
 	next := -1
@@ -644,13 +694,31 @@ func (b *Battle) over(tm []string) {
 	b.room.Save("data.roomnum", "")
 	b.room.Save("data.roomnum", "")
 	//b.room.Send("over", b.statistic())
+
 	b.room.Init()
+}
+
+func (b *Battle) betover(head, crt int) bool {
+	if head == crt && b.currents[crt].Action == "check" {
+		return true
+	}
+	return false
 }
 
 // check messages from clients
 func (b *Battle) check(msg map[string]interface{}) bool {
 	inf := "battle.check(): invalid msg %v: %v!!\n"
-	opt := msg["opt"].(string)
+	_, ok := msg["uid"]
+	if !ok {
+		log.Println(inf, "uid", "nil")
+		return false
+	}
+	val, ok := msg["opt"]
+	if !ok {
+		log.Println(inf, "opt", "nil")
+		return false
+	}
+	opt := val.(string)
 	switch opt {
 	case "enter", "leave":
 		if b.began {
@@ -659,18 +727,33 @@ func (b *Battle) check(msg map[string]interface{}) bool {
 			return false
 		}
 	case "back":
-		if !b.began {
-			log.Printf(inf, "opt", opt)
-			log.Println("battle has not began...")
-			return false
-		}
-	//这里要改 ...
+		// if !b.began {
+		// 	log.Printf(inf, "opt", opt)
+		// 	log.Println("battle has not began...")
+		// 	return false
+		// }
+		break
 	case "bet":
 		if b.when != "bet" {
 			log.Println("it's not time to bet")
 			return false
 		}
-
+		val, ok := msg["data"]
+		if !ok {
+			log.Println(inf, "data", "nil")
+			return false
+		}
+		data := val.(map[string]interface{})
+		ok, act := xx.Getstring(data, "action")
+		if !ok {
+			log.Println(inf, "action", act)
+			return false
+		}
+		ok, num := xx.Getnumber(data, "num")
+		if !ok {
+			log.Println(inf, "num", num)
+			return false
+		}
 	case "ready":
 		if b.when != "ready" {
 			return false

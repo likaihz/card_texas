@@ -1,0 +1,35 @@
+start ->
+handcards ->
+present ->
+
+下注开始
+	一圈下注开始（preflop）
+	choose ->
+	bet <-
+	bet ->
+	(present -> 循环至下注开始) / (betend ->)
+	一圈下注结束
+
+	board ->
+
+	一圈下注开始（flop）
+	...
+	一圈下注结束
+
+	board ->
+
+	一圈下注开始（turn）
+	...
+	一圈下注结束
+
+	board ->
+
+	一圈下注开始(river)
+	...
+	一圈下注结束
+下注结束
+
+(board ->)
+
+final ->
+

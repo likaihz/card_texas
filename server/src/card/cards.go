@@ -77,6 +77,10 @@ func (c *Cards) Rank() int {
 	return c.rank
 }
 
+func Rankname(n int) string {
+	rankname := [12]string{"", "high", "one", "two", "three", "straight", "flush", "fullhouse", "four", "straightflush", "royal"}
+	return rankname[n]
+}
 func (c *Cards) Compare(cards *Cards) int {
 	r := c.Rank()
 	rank := cards.Rank()

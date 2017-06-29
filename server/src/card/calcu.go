@@ -137,7 +137,7 @@ func CombinationTraversal(c []*Card) *Cards {
 	max := NewCards()
 	flag := []bool{}
 	for i := 0; i < n; i++ {
-		flag[i] = false
+		flag = append(flag, false)
 	}
 	for i := 0; i < 5; i++ {
 		max.Append(c[i])
